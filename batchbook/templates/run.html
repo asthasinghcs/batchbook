@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import csrf, heading, metric, check %}
+{% block title %}RUN-{{ '%04d'|format(run.id) }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('factory.runs') }}">Production runs</a>
+{% call heading('RUN-' ~ ('%04d'|format(run.id)), run.product ~ ' · ' ~ run.on_date ~ ' · ' ~ run.operator) %}
+  <a class="button" href="{{ url_for('audit.reports', report='ledger', start=run.on_date, end=run.on_date) }}">Stock movements</a>
+{% endcall %}
+<section class="metrics" aria-label="Run totals">
+  {{ metric('Expected output', run.planned_packets, 'Packets from the recipe') }}
+  {{ metric('Good output', run.actual_packets, (yield_variance[0] or '—') ~ ' vs expected', 'pending' if yield_variance[1] else '') }}
+  {{ metric('Cost per good packet', '₹' ~ (unit_cost|money) if unit_cost is not none else '—',
+    '₹' ~ ((run.price_paise - unit_cost)|money) ~ ' margin at list price' if unit_cost is not none else 'No good output') }}
+</section>
+<section class="panel">
+  <header class="panel-heading"><h2>Planned vs actual</h2><span class="muted">{{ (run.tolerance_bp / 100)|round(2) }}% tolerance</span></header>
+  <div class="table-wrap"><table><thead><tr><th>Measure</th><th>Unit</th><th class="number">Planned</th><th class="number">Used</th><th class="number">Waste</th><th class="number">Actual</th><th>Variance</th><th class="number">Material cost</th></tr></thead>
+    <tbody><tr><td><strong>Yield</strong></td><td>packet</td><td class="number">{{ run.planned_packets }}</td><td class="number">—</td>
+      <td class="number">—</td><td class="number">{{ run.actual_packets }}</td><td>{{ check(yield_variance) }}</td><td class="number">—</td></tr>
+    {% for line in lines %}<tr><td>{{ line.name }}</td><td>{{ line.unit }}</td><td class="number">{{ line.planned|qty(line.unit) }}</td>
+      <td class="number">{{ line.used|qty(line.unit) }}</td><td class="number">{{ line.wasted|qty(line.unit) }}</td>
+      <td class="number">{{ line.total|qty(line.unit) }}</td><td>{{ check(line.variance) }}</td><td class="number">₹{{ line.cost_paise|money }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<div class="split">
+  <section class="panel">
+    <header class="panel-heading"><h2>Run costing</h2></header>
+    <dl class="padded facts">
+      <div><dt>Material and packaging</dt><dd>₹{{ run.material_paise|money }}</dd></div>
+      <div><dt>Labour</dt><dd>₹{{ run.labour_paise|money }}</dd></div>
+      <div><dt>Gas and power</dt><dd>₹{{ run.energy_paise|money }}</dd></div>
+      <div class="fact-total"><dt>Total run cost</dt><dd>₹{{ (run.material_paise + run.labour_paise + run.energy_paise)|money }}</dd></div>
+    </dl>
+    {% if run.notes %}<p class="padded note">{{ run.notes }}</p>{% endif %}
+  </section>
+  {% if operator %}
+  <section class="panel">
+    <header class="panel-heading"><h2>Update overheads</h2></header>
+    <form method="post" action="{{ url_for('factory.run_cost', run_id=run.id) }}" class="padded form-stack">{{ csrf() }}
+      <div class="form-grid two"><label>Labour (₹)<input name="labour" type="number" min="0" step="0.01" value="{{ run.labour_paise|money|replace(',', '') }}" required></label>
+        <label>Gas and power (₹)<input name="energy" type="number" min="0" step="0.01" value="{{ run.energy_paise|money|replace(',', '') }}" required></label></div>
+      <label>Run notes<textarea name="notes" maxlength="400" rows="2">{{ run.notes }}</textarea></label>
+      <div><button class="button primary">Save cost</button></div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+<details class="panel padded"><summary>Activity log</summary>
+  <ul class="activity">{% for event in events %}<li><strong>{{ event.action|replace('_', ' ')|capitalize }}</strong><span>{{ event.display_name }} · {{ event.created_at }}</span></li>{% endfor %}</ul>
+</details>
+{% endblock %}

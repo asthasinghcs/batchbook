@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import heading, status, empty %}
+{% block title %}{{ 'My orders' if mine else 'Orders' }}{% endblock %}
+{% block content %}
+{% call heading('My orders' if mine else 'Sales orders', 'Submit orders and see what the factory has dispatched.' if mine else 'Check stock and review orders from the field.') %}
+  {% if mine %}<a class="button primary" href="{{ url_for('sales.new_order') }}">New order</a>{% endif %}
+{% endcall %}
+{% if mine %}<aside id="sync-status" class="notice" hidden data-account="{{ g.user.id }}" data-token="{{ url_for('sales.sync_token') }}" data-sync="{{ url_for('sales.sync') }}" aria-live="polite">
+  <span data-sync-message></span><button type="button" class="button button-small" data-sync-now>Retry sync</button>
+  <button type="button" class="button button-small button-quiet" data-clear-queue>Discard offline queue</button>
+</aside>{% endif %}
+<section class="panel">
+  <form method="get" class="panel-heading filter-line"><label>Status
+    <select name="status" aria-label="Order status"><option value="">All statuses</option>
+      {% for name in stages %}<option value="{{ name }}" {{ 'selected' if name == stage }}>{{ name|capitalize }}</option>{% endfor %}
+    </select></label><button class="button button-small" type="submit">Apply</button>
+  </form>
+  {% if orders %}
+  <div class="table-wrap"><table class="orders-table"><thead><tr><th>Order</th><th>Customer</th>{% if not mine %}<th>Salesperson</th>{% endif %}<th class="number">Packets</th><th>Status</th></tr></thead>
+  <tbody>{% for row in orders %}<tr>
+    <td><a href="{{ url_for('sales.order', order_id=row.id) }}">SO-{{ '%04d'|format(row.id) }}</a><small>{{ row.on_date }}</small></td>
+    <td>{{ row.customer }}</td>{% if not mine %}<td>{{ row.salesman }}</td>{% endif %}<td class="number">{{ row.packets }}</td>
+    <td>{{ status(row.status) }}</td>
+  </tr>{% endfor %}</tbody></table></div>
+  {% else %}{{ empty('No orders match this view.') }}{% endif %}
+</section>
+{% if mine %}
+<section class="panel">
+  <header class="panel-heading"><h2>Sales by customer</h2><span class="muted">Dispatched orders</span></header>
+  {% if customers %}
+  <div class="table-wrap"><table><thead><tr><th>Customer</th><th class="number">Invoices</th><th class="number">Sales before GST</th></tr></thead>
+    <tbody>{% for row in customers %}<tr><td>{{ row.customer_name }}</td><td class="number">{{ row.invoices }}</td>
+      <td class="number">₹{{ row.net_sales|money }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}{{ empty('Customer totals appear after dispatch.') }}{% endif %}
+</section>
+{% endif %}
+{% endblock %}

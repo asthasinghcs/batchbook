@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import heading, empty %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+{% call heading('Reports', 'Review and export the factory records for a date range.') %}
+  {% if full %}<a class="button primary" href="{{ url_for('audit.reports', report='all', start=start, end=end, format='xlsx') }}">Export monthly workbook</a>{% endif %}
+{% endcall %}
+<form method="get" class="panel padded report-filters">
+  <label>Report<select name="report">{% for name, (label, _) in choices.items() %}
+    <option value="{{ name }}" {{ 'selected' if name == key }}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Start date<input type="date" name="start" value="{{ start }}" required></label>
+  <label>End date<input type="date" name="end" value="{{ end }}" required></label>
+  {% if items %}<label>Item<select name="item_id"><option value="">All items</option>{% for item in items %}
+    <option value="{{ item.id }}" {{ 'selected' if item.id == item_id }}>{{ item.name }}</option>{% endfor %}</select></label>{% endif %}
+  <button class="button">View report</button>
+</form>
+{% if key == 'outstanding' %}<div class="notice">Receivables include invoices and payments through the end date. Ageing uses each invoice’s due date.</div>{% endif %}
+<section class="panel">
+  <header class="panel-heading report-heading">
+    <div><h2>{{ report.title }}</h2><span class="muted">{{ period }}</span></div>
+    <div class="actions">
+      {% for kind, label in [('csv', 'CSV'), ('xlsx', 'Excel'), ('pdf', 'PDF')] %}
+        <a class="button button-small" href="{{ url_for('audit.reports', report=key, start=start, end=end, item_id=item_id, format=kind) }}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </header>
+  {% if report.rows %}
+    <div class="table-wrap"><table><thead><tr>{% for label in report.headers %}<th>{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in report.rows %}<tr>{% for cell in row %}<td{% if cell is number %} class="number"{% endif %}>{{ cell|report_cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table></div>
+  {% else %}{{ empty('No posted records to show for this period.') }}{% endif %}
+</section>
+{% endblock %}

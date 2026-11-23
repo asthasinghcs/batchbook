@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}Workspace{% endblock %} · Batchbook</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='batchbook.css') }}">
+  <script defer src="{{ url_for('static', filename='batchbook.js') }}"></script>
+</head>
+<body>
+{% macro brand() %}
+  <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+  <span>Batchbook</span>
+{% endmacro %}
+<a class="skip-link" href="#content">Skip to content</a>
+{% if g.user %}
+  {% set role = g.user.role %}
+  {% set endpoint = request.endpoint or '' %}
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="{{ url_for('web.home') }}">{{ brand() }}</a>
+      <div class="factory-label">Kaveri Snack Works</div>
+      <nav aria-label="Workspace">
+        {% if role in ['admin', 'owner'] %}<a href="{{ url_for('web.home') }}" {% if endpoint == 'web.home' %}aria-current="page"{% endif %}>Overview</a>{% endif %}
+        {% if role in ['admin', 'sales'] %}<a href="{{ url_for('sales.orders') }}" {% if endpoint in ['sales.orders', 'sales.order', 'sales.new_order'] %}aria-current="page"{% endif %}>{{ 'My orders' if role == 'sales' else 'Orders' }}</a>{% endif %}
+        {% if role in ['admin', 'auditor', 'owner'] %}<a href="{{ url_for('sales.invoices') }}" {% if endpoint in ['sales.invoices', 'sales.invoice'] %}aria-current="page"{% endif %}>Invoices</a>{% endif %}
+        {% if role in ['admin', 'production', 'auditor', 'owner'] %}<a href="{{ url_for('factory.runs') }}" {% if endpoint in ['factory.runs', 'factory.run', 'factory.new_run'] %}aria-current="page"{% endif %}>Production</a>{% endif %}
+        {% if role in ['admin', 'production'] %}<a href="{{ url_for('factory.purchases') }}" {% if endpoint == 'factory.purchases' %}aria-current="page"{% endif %}>Purchases</a>{% endif %}
+        {% if role != 'sales' %}
+          <a href="{{ url_for('factory.stock') }}" {% if endpoint == 'factory.stock' %}aria-current="page"{% endif %}>Stock</a>
+          <a href="{{ url_for('audit.reports') }}" {% if endpoint == 'audit.reports' %}aria-current="page"{% endif %}>Reports</a>
+        {% endif %}
+        {% if role == 'admin' %}<a href="{{ url_for('factory.master', section='items') }}" {% if endpoint == 'factory.master' %}aria-current="page"{% endif %}>Master data</a>{% endif %}
+      </nav>
+      <div class="sidebar-bottom"><span class="factory-label">Tiruchirappalli, Tamil Nadu</span></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div><span class="role-label">{{ role_labels[role] }}</span><span class="topbar-date">{{ business_date.strftime('%d %b %Y') }}</span></div>
+        <form method="post" action="{{ url_for('web.logout') }}" class="identity">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <span class="identity-name">{{ g.user.display_name }}</span>
+          <button class="button button-small button-quiet" type="submit">Sign out</button>
+        </form>
+      </header>
+{% endif %}
+      <main id="content" class="{{ 'page' if g.user else 'public-page' }}">
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+          <div class="notice {{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</div>
+        {% endfor %}
+        {% block content %}{% endblock %}
+      </main>
+{% if g.user %}</div></div>{% endif %}
+</body>
+</html>

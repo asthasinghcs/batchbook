@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import heading %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{{ heading(title, message) }}
+<a href="{{ url_for('web.home') }}" class="button">Return to workspace</a>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import heading, empty, check %}
+{% block title %}Production runs{% endblock %}
+{% block content %}
+{% call heading('Production runs', 'Post material issues and compare finished yield against the recipe.') %}
+  {% if operator %}<a class="button primary" href="{{ url_for('factory.new_run') }}">New production run</a>{% endif %}
+{% endcall %}
+<section class="panel">
+  {% if runs %}
+  <div class="table-wrap"><table><thead><tr><th>Run</th><th>Product</th><th class="number">Expected</th><th class="number">Good packets</th><th>Yield variance</th><th class="number">Cost / packet</th></tr></thead>
+  <tbody>{% for run in runs %}<tr><td><a href="{{ url_for('factory.run', run_id=run.id) }}">RUN-{{ '%04d'|format(run.id) }}</a><small>{{ run.on_date }}</small></td>
+    <td>{{ run.product }}</td><td class="number">{{ run.planned_packets }}</td><td class="number">{{ run.actual_packets }}</td><td>{{ check(run.yield_variance) }}</td>
+    <td class="number">{{ '₹' ~ (run.unit_cost|money) if run.unit_cost is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div>
+  {% else %}{{ empty('No production runs have been posted.') }}{% endif %}
+</section>
+{% endblock %}

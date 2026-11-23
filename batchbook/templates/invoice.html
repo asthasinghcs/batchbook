@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import csrf, heading, metric, status, empty %}
+{% block title %}{{ invoice.number }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('sales.invoices') }}">Invoices</a>
+{% call heading(invoice.number, invoice.customer_name ~ ' · Issued ' ~ invoice.on_date ~ ' · Due ' ~ invoice.due_date) %}
+  <a class="button" href="{{ url_for('sales.invoice_pdf', invoice_id=invoice.id) }}">Invoice PDF</a>
+  {% if admin and invoice.email and not invoice.credit_id %}<a class="button" href="mailto:{{ invoice.email }}?{{ mail_query }}" title="Download the PDF and attach it to the email">Draft email</a>{% endif %}
+  {% if admin and invoice.status == 'invoiced' %}
+    <form method="post" action="{{ url_for('sales.invoice_action', invoice_id=invoice.id, operation='dispatch') }}">{{ csrf() }}<button class="button primary">Record dispatch</button></form>
+  {% endif %}
+{% endcall %}
+{% if invoice.credit_id %}<div class="notice warning">Cancelled by {{ invoice.credit_number }}.
+  <a href="{{ url_for('sales.invoice_pdf', invoice_id=invoice.id, credit=1) }}">Download credit note</a></div>{% endif %}
+<section class="metrics" aria-label="Invoice amounts">
+  {{ metric('Invoice total', '₹' ~ (invoice.total|money), 'Including GST') }}
+  {{ metric('Collected', '₹' ~ (invoice.paid|money)) }}
+  {{ metric('Outstanding', '₹' ~ ((0 if invoice.credit_id else invoice.total - invoice.paid)|money)) }}
+</section>
+<section class="panel">
+  <header class="panel-heading"><h2>Tax invoice</h2>{{ status(invoice.status) }}</header>
+  <div class="padded invoice-addresses">
+    <div><strong>{{ factory_name }}</strong><p>{{ factory_address }}<br>GSTIN {{ factory_gstin }}</p></div>
+    <div><strong>{{ invoice.customer_name }}</strong><p>{{ invoice.billing_address }}<br>GSTIN {{ invoice.gstin or 'Unregistered' }}</p></div>
+    <div><strong>Place of supply</strong><p>{{ states[invoice.place_of_supply] }} ({{ invoice.place_of_supply }})<br>{{ invoice.delivery_address }}</p></div>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>Product</th><th>HSN</th><th class="number">Packets</th><th class="number">Unit price</th><th class="number">Taxable</th><th class="number">CGST</th><th class="number">SGST</th><th class="number">IGST</th></tr></thead>
+    <tbody>{% for line in lines %}<tr><td>{{ line.description }}</td><td>{{ line.hsn }}</td><td class="number">{{ line.packets }}</td>
+      <td class="number">₹{{ line.price_paise|money }}</td><td class="number">₹{{ line.taxable|money }}</td>
+      <td class="number">₹{{ line.cgst|money }}</td><td class="number">₹{{ line.sgst|money }}</td><td class="number">₹{{ line.igst|money }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<div class="split">
+  <section class="panel">
+    <header class="panel-heading"><h2>Payments</h2></header>
+    {% if payments %}
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Receipt</th><th class="number">Amount</th></tr></thead>
+      <tbody>{% for payment in payments %}<tr><td>{{ payment.on_date }}</td><td>{{ payment.reference }}<small>{{ payment.mode }}</small></td>
+        <td class="number">₹{{ payment.amount|money }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}{{ empty('No payments recorded.') }}{% endif %}
+  </section>
+  {% if admin and not invoice.credit_id and invoice.paid < invoice.total %}
+  <section class="panel">
+    <header class="panel-heading"><h2>Record payment</h2></header>
+    <form method="post" action="{{ url_for('sales.invoice_action', invoice_id=invoice.id, operation='payment') }}" class="padded form-stack">{{ csrf() }}
+      <div class="form-grid two">
+        <label>Amount (₹)<input name="amount" type="number" step="0.01" min="0.01" required></label>
+        <label>Method<select name="mode"><option>Cash</option><option>UPI</option><option>Bank transfer</option><option>Cheque</option></select></label>
+      </div>
+      <label>Receipt reference<input name="reference" required maxlength="60"></label>
+      <div><button class="button primary">Save payment</button></div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% if admin and invoice.status == 'invoiced' and not invoice.paid %}
+  <details class="panel padded"><summary>Cancel invoice with a credit note</summary>
+    <form method="post" action="{{ url_for('sales.invoice_action', invoice_id=invoice.id, operation='credit') }}" class="form-stack form-section">{{ csrf() }}
+      <label>Reason<input name="reason" maxlength="200" required></label>
+      <div><button class="button button-danger">Issue full credit note</button></div>
+    </form>
+  </details>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import csrf, heading, empty %}
+{% block title %}New production run{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('factory.runs') }}">Production runs</a>
+{{ heading('New production run', 'Posting issues materials and receives the good packets into finished stock.') }}
+{% if recipe %}
+<div class="panel padded">
+  <form method="get" class="actions product-choice">
+    <label>Product<select name="product">{% for product in products %}
+      <option value="{{ product.id }}" {{ 'selected' if product.id == product_id }}>{{ product.name }}</option>{% endfor %}</select></label>
+    {% if products|length > 1 %}<button type="submit" class="button">Load recipe</button>{% endif %}
+  </form>
+</div>
+<form method="post" class="panel" data-run-form data-planned="{{ recipe.expected_packets }}">
+  {{ csrf() }}<input type="hidden" name="client_ref" value="{{ ref }}"><input type="hidden" name="product_id" value="{{ product_id }}">
+  <div class="padded form-grid three">
+    <label>Batches<input type="number" name="batches" min="0.001" max="100" step="0.001" value="{{ request.form.get('batches', '1') }}" required></label>
+    <label>Good packets<input type="number" name="good_packets" min="0" step="1" value="{{ request.form.get('good_packets', '') }}" required></label>
+    <div class="planned-output"><span>Expected packets</span><strong data-planned-output>{{ recipe.expected_packets }}</strong></div>
+  </div>
+  <header class="panel-heading"><h2>Material issues</h2><span class="muted">{{ (recipe.tolerance_bp / 100)|round(2) }}% variance tolerance</span></header>
+  <div class="table-wrap"><table><thead><tr><th>Material</th><th>Standard / batch</th><th>In stock</th><th>Used</th><th>Waste</th><th>Entry unit</th></tr></thead>
+    <tbody>{% for item in components %}<tr>
+      <td>{{ item.name }}</td><td>{{ item.per_batch|qty(item.unit) }} {{ item.unit }}</td><td>{{ item.on_hand|qty(item.unit) }} {{ item.unit }}</td>
+      <td><input class="inline-input" type="number" step="any" min="0" name="used_{{ item.id }}" aria-label="{{ item.name }} used" value="{{ request.form.get('used_' ~ item.id, '') }}" required></td>
+      <td><input class="inline-input" type="number" step="any" min="0" name="waste_{{ item.id }}" aria-label="{{ item.name }} waste" value="{{ request.form.get('waste_' ~ item.id, '0') }}"></td>
+      <td><select name="unit_{{ item.id }}" aria-label="{{ item.name }} unit">{% for unit in item.units %}
+        <option value="{{ unit }}" {{ 'selected' if request.form.get('unit_' ~ item.id, item.unit) == unit }}>{{ unit }}</option>{% endfor %}</select></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="padded form-stack">
+    <p class="muted">Stock issued is the amount used plus waste. Enter both in the selected unit.</p>
+    <label>Run notes <span class="muted">(optional)</span><textarea name="notes" rows="2" maxlength="400">{{ request.form.get('notes', '') }}</textarea></label>
+    <div class="actions"><button class="button primary">Post production run</button><a href="{{ url_for('factory.runs') }}" class="button button-quiet">Cancel</a></div>
+  </div>
+</form>
+{% else %}
+<section class="panel">{{ empty('Create a Bill of Materials for a finished product before posting a run.') }}</section>
+{% endif %}
+{% endblock %}

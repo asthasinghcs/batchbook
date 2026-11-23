@@ -1,0 +1,18 @@
+{% macro csrf() %}<input type="hidden" name="csrf" value="{{ csrf_token() }}">{% endmacro %}
+{% macro status(value) %}
+  <span class="status status-{{ value }}">{{ value|capitalize }}</span>
+{% endmacro %}
+{% macro heading(title, description='') %}
+  <header class="page-heading">
+    <div><h1>{{ title }}</h1>{% if description %}<p>{{ description }}</p>{% endif %}</div>
+    {% if caller is defined %}<div class="actions">{{ caller() }}</div>{% endif %}
+  </header>
+{% endmacro %}
+{% macro empty(message) %}<div class="empty">{{ message }}</div>{% endmacro %}
+{% macro metric(label, value, detail='', kind='') %}
+  <article class="metric {{ kind }}"><div>{{ label }}</div><strong>{{ value }}</strong>{% if detail %}<small>{{ detail }}</small>{% endif %}</article>
+{% endmacro %}
+{% macro check(result) %}
+  <span class="variance {{ 'flagged' if result[1] }}">{{ result[0] or '—' }}</span>
+  {% if result[1] %}<span class="status status-short">Review</span>{% endif %}
+{% endmacro %}

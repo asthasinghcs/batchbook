@@ -1,5 +1,7 @@
 """Receipts, production and dispatch all write to the same stock ledger."""
 
+from uuid import UUID
+
 from .db import BusinessError, atomic, audit, db, required, today
 from .numbers import qty_text, quantity, round_ratio, scaled, unit_scale
 
@@ -83,13 +85,24 @@ def recipe_for(product_id):
     return recipe, lines
 
 
-def run(actor, product_id, batches, good_packets, amounts, notes):
+def run(actor, product_id, batches, good_packets, amounts, notes, client_ref=None):
+    if client_ref:
+        try:
+            client_ref = str(UUID(client_ref))
+        except ValueError:
+            raise BusinessError("Refresh the run form and try again.") from None
     batch_milli = scaled(batches, 1000, "Batches", minimum=1, maximum=100_000)
     actual = scaled(good_packets, 1, "Good packets")
     notes = notes.strip()
     if len(notes) > 400:
         raise BusinessError("Keep the run note within 400 characters.")
     with atomic() as connection:
+        if client_ref:
+            existing = connection.execute(
+                "SELECT id FROM runs WHERE actor_id = ? AND client_ref = ?", (actor, client_ref)
+            ).fetchone()
+            if existing:
+                return existing["id"]
         recipe, lines = recipe_for(product_id)
         planned = round_ratio(recipe["expected_packets"] * batch_milli, 1000)
         if planned == 0:
@@ -106,10 +119,10 @@ def run(actor, product_id, batches, good_packets, amounts, notes):
         run_id = connection.execute(
             """INSERT INTO runs
                (product_id, on_date, batch_milli, planned_packets, actual_packets, tolerance_bp,
-                material_paise, notes, actor_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                material_paise, notes, actor_id, client_ref)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (product_id, today().isoformat(), batch_milli, planned, actual, recipe["tolerance_bp"],
-             material_cost, notes, actor),
+             material_cost, notes, actor, client_ref),
         ).lastrowid
         for item_id, standard, used, wasted, cost in consumption:
             connection.execute(

@@ -75,7 +75,9 @@ CREATE TABLE IF NOT EXISTS runs (
     labour_paise INTEGER NOT NULL DEFAULT 0 CHECK (labour_paise >= 0),
     energy_paise INTEGER NOT NULL DEFAULT 0 CHECK (energy_paise >= 0),
     notes TEXT NOT NULL DEFAULT '',
-    actor_id INTEGER NOT NULL REFERENCES users(id)
+    actor_id INTEGER NOT NULL REFERENCES users(id),
+    client_ref TEXT,
+    UNIQUE(actor_id, client_ref)
 );
 
 CREATE TABLE IF NOT EXISTS run_lines (

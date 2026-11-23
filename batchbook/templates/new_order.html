@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import csrf, heading %}
+{% macro line(selected, count, unit) %}
+  <div class="order-line" data-order-line>
+    <label class="product-select">Product<select name="product_id" required>
+      <option value="">Choose product</option>
+      {% for product in products %}
+        <option value="{{ product.id }}" data-packet-price="{{ product.price_paise }}" data-pack="{{ product.packets_per_carton }}"
+          {{ 'selected' if product.id|string == selected|string }}>{{ product.name }} · ₹{{ product.price_paise|money }}</option>
+      {% endfor %}
+    </select></label>
+    <label>Quantity<input name="count" type="number" inputmode="numeric" min="1" max="1000000" step="1" placeholder="0" value="{{ count }}" required></label>
+    <label>Unit<select name="unit"><option value="packet" {{ 'selected' if unit == 'packet' }}>Packets</option><option value="carton" {{ 'selected' if unit == 'carton' }}>Cartons</option></select></label>
+    <button type="button" class="button button-small button-quiet remove-line" data-remove-line aria-label="Remove product" hidden>Remove</button>
+  </div>
+{% endmacro %}
+{% block title %}New order{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('sales.orders') }}">My orders</a>
+{{ heading('New order', 'Prices come from the factory price list. Stock is checked during approval.') }}
+<aside id="sync-status" class="notice" hidden data-account="{{ g.user.id }}" data-token="{{ url_for('sales.sync_token') }}" data-sync="{{ url_for('sales.sync') }}" aria-live="polite">
+  <span data-sync-message></span><button type="button" class="button button-small" data-sync-now>Retry sync</button>
+  <button type="button" class="button button-small button-quiet" data-clear-queue>Discard offline queue</button>
+</aside>
+<form method="post" class="panel padded form-stack order-entry" data-new-order data-account="{{ g.user.id }}">
+  {{ csrf() }}<input type="hidden" name="client_ref" value="{{ ref }}">
+  <label>Customer<select name="customer_id" required>
+    <option value="">Choose customer</option>
+    {% for customer in customers %}<option value="{{ customer.id }}" {{ 'selected' if request.form.get('customer_id') == customer.id|string }}>
+      {{ customer.name }} · {{ states[customer.state_code] }}</option>{% endfor %}
+  </select></label>
+  <div class="form-section"><h2>Products</h2>
+    <div data-order-lines>{% for product, count, unit in entries %}{{ line(product, count, unit) }}{% endfor %}</div>
+    <template data-line-template>{{ line('', '', 'packet') }}</template>
+    <button type="button" class="button button-small" data-add-line hidden>Add product</button>
+  </div>
+  <div class="order-total"><span>Estimated subtotal before GST</span><strong id="order-estimate" aria-live="polite">—</strong></div>
+  <div class="actions"><button class="button primary" data-order-submit type="submit">Send order</button><a class="button button-quiet" href="{{ url_for('sales.orders') }}">Cancel</a></div>
+</form>
+{% endblock %}

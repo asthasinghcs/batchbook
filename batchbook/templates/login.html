@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import csrf with context %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="login-layout">
+  <section class="login-intro">
+    <div class="brand">{{ brand() }}</div>
+    <div class="login-copy">
+      <p class="eyebrow">KAVERI SNACK WORKS</p>
+      <h1>From the factory floor to the books.</h1>
+      <p>Orders, production, stock and month-end accounts in one place.</p>
+      <div class="login-flow" aria-hidden="true"><span>Production</span><span>Finished stock</span><span>Dispatch</span></div>
+    </div>
+    <div class="login-location">Tiruchirappalli, Tamil Nadu</div>
+  </section>
+  <section class="login-panel" aria-labelledby="sign-in-title">
+    <h2 id="sign-in-title">Sign in</h2>
+    <form method="post" class="form-stack">
+      {{ csrf() }}
+      <label>Username<input name="username" autocomplete="username" required maxlength="40" value="{{ request.form.get('username', '') }}"></label>
+      <label>Password<input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
+      <button class="button primary">Sign in</button>
+    </form>
+    {% if accounts %}
+      <div class="demo-logins">
+        <h3>Try a demo account</h3>
+        <div class="demo-accounts">
+          {% for username, name, _ in accounts %}
+            <form method="post">{{ csrf() }}
+              <input type="hidden" name="username" value="{{ username }}">
+              <input type="hidden" name="password" value="{{ demo_password }}">
+              <button class="button button-small" type="submit">{{ name }}</button>
+            </form>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

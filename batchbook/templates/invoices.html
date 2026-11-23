@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import heading, status, empty %}
+{% block title %}Invoices{% endblock %}
+{% block content %}
+{{ heading('Invoices', 'Posted GST invoices, dispatch status and balances.') }}
+<section class="panel">
+  {% if invoices %}
+  <div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>Status</th><th class="number">Total</th><th class="number">Outstanding</th></tr></thead>
+  <tbody>{% for inv in invoices %}<tr>
+    <td><a href="{{ url_for('sales.invoice', invoice_id=inv.id) }}">{{ inv.number }}</a><small>{{ inv.on_date }}</small></td>
+    <td>{{ inv.customer_name }}</td><td>{{ status(inv.status) }}</td>
+    <td class="number">₹{{ inv.total|money }}</td><td class="number">₹{{ (0 if inv.status == 'cancelled' else inv.total - inv.paid)|money }}</td>
+  </tr>{% endfor %}</tbody></table></div>
+  {% else %}{{ empty('Invoices appear here once they are raised against approved orders.') }}{% endif %}
+</section>
+{% endblock %}

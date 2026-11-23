@@ -67,7 +67,7 @@ class BusinessWorkflow(unittest.TestCase):
         self.assertFalse(seed_demo())
 
     def test_run_failure_keeps_all_balances_and_records_unchanged(self):
-        bad = dict(ISSUES, **{})
+        bad = dict(ISSUES)
         bad[5] = ("31", "0", "piece")
         with self.assertRaisesRegex(BusinessError, "has only 30"):
             inventory.run(4, 6, "1", "188", bad, "")

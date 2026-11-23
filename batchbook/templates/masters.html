@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import csrf, heading, empty %}
+{% block title %}Master data{% endblock %}
+{% block content %}
+{{ heading('Master data', 'Maintain the records used by orders, receipts, and production.') }}
+<nav class="tabs" aria-label="Master data sections">
+  {% for key, name in [('items', 'Items'), ('customers', 'Customers'), ('suppliers', 'Suppliers'), ('recipes', 'Recipes (BOM)')] %}
+    <a href="{{ url_for('factory.master', section=key) }}" {% if key == section %}aria-current="page"{% endif %}>{{ name }}</a>{% endfor %}
+</nav>
+{% if section == 'recipes' %}
+  <section class="panel">
+    <header class="panel-heading"><h2>Bill of Materials</h2></header>
+    {% if products %}
+    <form method="get" class="padded actions product-choice">
+      <label>Product<select name="product_id">{% for product in products %}
+        <option value="{{ product.id }}" {{ 'selected' if product.id == product_id }}>{{ product.name }}</option>{% endfor %}</select></label>
+      <button class="button">Load product</button>
+    </form>
+    <form method="post" class="padded form-stack">{{ csrf() }}<input type="hidden" name="product_id" value="{{ product_id }}">
+      <div class="form-grid two"><label>Expected packets per batch<input type="number" name="expected" min="1" step="1" value="{{ request.form.get('expected', recipe.expected_packets if recipe else '200') }}" required></label>
+        <label>Variance tolerance (%)<input name="tolerance" type="number" min="0" max="100" step="0.01" value="{{ request.form.get('tolerance', (recipe.tolerance_bp / 100) if recipe else '3') }}" required></label></div>
+      <p class="muted">Give the quantity per batch in the item’s base unit. Leave unused materials blank.</p>
+      <div class="form-grid three">{% for item in materials %}
+        <label>{{ item.name }} ({{ item.unit }})<input type="number" name="item_{{ item.id }}" step="any" min="0" value="{{ request.form.get('item_' ~ item.id, current[item.id]|qty(item.unit) if item.id in current else '') }}"></label>
+      {% endfor %}</div>
+      <div><button class="button primary">Save recipe</button></div>
+    </form>
+    {% else %}{{ empty('Add a finished item before creating its recipe.') }}{% endif %}
+  </section>
+{% else %}
+  <section class="panel">
+    <header class="panel-heading"><h2>{{ section|capitalize }}</h2></header>
+    {% if records %}<div class="table-wrap"><table><thead><tr>
+      {% if section == 'items' %}<th>SKU</th><th>Item</th><th>Type</th><th>Unit</th><th class="number">List price</th>
+      {% elif section == 'customers' %}<th>Name</th><th>Type</th><th>State</th><th>GSTIN</th><th>Credit days</th>
+      {% else %}<th>Supplier name</th><th>GSTIN</th>{% endif %}
+    </tr></thead><tbody>{% for row in records %}<tr>
+      {% if section == 'items' %}<td>{{ row.sku }}</td><td>{{ row.name }}</td><td>{{ row.kind|capitalize }}</td>
+        <td>{{ row.unit }}</td><td class="number">{{ '₹' ~ (row.price_paise|money) if row.kind == 'finished' else '—' }}</td>
+      {% elif section == 'customers' %}<td>{{ row.name }}</td><td>{{ row.kind }}</td><td>{{ states[row.state_code] }}</td>
+        <td>{{ row.gstin or 'Unregistered' }}</td><td>{{ row.credit_days }}</td>
+      {% else %}<td>{{ row.name }}</td><td>{{ row.gstin or 'Unregistered' }}</td>{% endif %}
+    </tr>{% endfor %}</tbody></table></div>{% else %}{{ empty('No records yet.') }}{% endif %}
+  </section>
+  <section class="panel">
+    <header class="panel-heading"><h2>{{ {'items': 'New item', 'customers': 'New customer', 'suppliers': 'New supplier'}[section] }}</h2></header>
+    <form method="post" class="padded form-stack">{{ csrf() }}
+      <div class="form-grid three">
+        <label>Name<input name="name" required maxlength="80" value="{{ request.form.get('name', '') }}"></label>
+        {% if section == 'items' %}
+          <label>SKU<input name="sku" maxlength="24" required value="{{ request.form.get('sku', '') }}"></label>
+          <label>Type<select name="kind" data-item-kind>
+            {% for value, name in [('raw', 'Raw material'), ('packaging', 'Packaging'), ('finished', 'Finished product')] %}
+              <option value="{{ value }}" {{ 'selected' if request.form.get('kind') == value }}>{{ name }}</option>
+            {% endfor %}
+          </select></label>
+          <label>Base unit<select name="unit" data-master-unit>
+            {% for unit in ['kg', 'L', 'piece', 'packet'] %}<option {{ 'selected' if request.form.get('unit') == unit }}>{{ unit }}</option>{% endfor %}
+          </select></label>
+        {% elif section == 'customers' %}
+          <label>Type<select name="kind">{% for value in ['Retailer', 'Distributor'] %}
+            <option {{ 'selected' if request.form.get('kind') == value }}>{{ value }}</option>{% endfor %}</select></label>
+          <label>Place of supply<select name="state_code">{% for code, state in states.items() %}
+            <option value="{{ code }}" {{ 'selected' if request.form.get('state_code', '33') == code }}>{{ state }}</option>
+          {% endfor %}</select></label>
+          <label>Credit days<input name="credit_days" type="number" min="0" max="365" step="1" value="{{ request.form.get('credit_days', '30') }}" required></label>
+          <label>Billing address<input name="billing_address" maxlength="180" required value="{{ request.form.get('billing_address', '') }}"></label>
+          <label>Delivery address<input name="delivery_address" maxlength="180" placeholder="Same as billing by default" value="{{ request.form.get('delivery_address', '') }}"></label>
+          <label>Email<input type="email" name="email" maxlength="120" value="{{ request.form.get('email', '') }}"></label>
+        {% endif %}
+        {% if section != 'items' %}<label>GSTIN <span class="muted">(optional)</span><input name="gstin" maxlength="15" value="{{ request.form.get('gstin', '') }}"></label>{% endif %}
+      </div>
+      {% if section == 'items' %}
+        <fieldset class="form-grid three" data-finished-fields><legend>Finished product details</legend>
+          <label>Selling price (₹)<input type="number" name="price" min="0.01" step="0.01" value="{{ request.form.get('price', '') }}"></label>
+          <label>GST rate (%)<input type="number" name="gst" min="0" max="100" step="0.01" value="{{ request.form.get('gst', '5') }}"></label>
+          <label>HSN code<input name="hsn" maxlength="8" inputmode="numeric" value="{{ request.form.get('hsn', '') }}"></label>
+          <label>Packets per carton<input type="number" name="pack" min="1" step="1" value="{{ request.form.get('pack', '20') }}"></label>
+        </fieldset>
+      {% endif %}
+      <div><button class="button primary">Save record</button></div>
+    </form>
+  </section>
+{% endif %}
+{% endblock %}
