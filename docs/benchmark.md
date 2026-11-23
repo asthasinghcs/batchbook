@@ -3,8 +3,8 @@
 Start with a fresh database. Use one browser profile per role, or sign out between steps. The given opening balances are loaded automatically.
 
 1. As **Factory Admin**, open **Purchases**. Choose Demo Flour Supply and Flour, enter 60 kg at ₹45 per kg and use receipt reference `FLOUR-60`.
-2. As **Production Supervisor**, open **Production → New production run**. Choose Murukku 200 g and one batch. Enter 40 kg flour, 10.5 L oil and 1.2 kg spice mix. Put those amounts in **Used**.
-3. Enter 188 good packets. Enter 188 used and 6 wasted for the 200 g pouch, and 9 used cartons. Post. Show the −6% yield and +5% oil flags. Open **Stock** to show 120 kg flour, 19.5 L oil, 306 pouches and 238 finished packets.
+2. As **Production Supervisor**, open **Production → Start a batch**. Choose Murukku 200 g and one batch. Enter 40 kg flour, 10.5 L oil and 1.2 kg spice mix in **Used**. Save the material sheet.
+3. Enter 188 good packets, 188 used and 6 wasted pouches, and 9 used cartons. Post the batch. Show the −6% yield and +5% oil flags. In **Stock after this batch**, show 120 kg flour, 19.5 L oil, 306 pouches and 238 finished packets. Open the flour ledger to show both the receipt and the batch issue.
 4. At phone width as **Salesman A**, open **New order**. Select Retailer A and order 150 Murukku packets.
 5. As **Factory Admin**, review the order, approve and reserve it, and raise the invoice. Show the ₹7,875 PDF total with CGST and SGST of ₹187.50 each. Record dispatch. Show 88 finished packets in **Stock**.
 6. At phone width as **Salesman B**, submit 120 packets for Distributor B. As admin, open the order and show the 32-packet shortage and the IGST indicator. The order stays submitted and can be revisited after replenishment.
@@ -25,6 +25,6 @@ The problem statement permits AI coding assistants. Be ready to explain the beha
 ## Read the code in this order
 
 1. Start with [the schema](../batchbook/schema.sql). Find `items`, `stock_moves`, `runs`, `run_lines` and `invoices`.
-2. Read `move()` and `run()` in [inventory.py](../batchbook/inventory.py). Point to the lines that issue flour and receive finished packets within one transaction.
+2. Read `start_run()` and `post_run()` in [inventory.py](../batchbook/inventory.py). Point to where the plan is saved and where the flour issue and finished receipt are committed.
 3. Read `review()`, `invoice()` and `dispatch()` in [sales.py](../batchbook/sales.py). Follow order SO-0001 across the three steps.
 4. Open [test_workflow.py](../tests/test_workflow.py) and read the assertions under `test_section_five_end_to_end`. Each assertion checks the same result the reviewer will see in the video.

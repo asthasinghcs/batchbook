@@ -1,6 +1,6 @@
 # Batchbook
 
-An order-to-audit prototype for Kaveri Snack Works, a fictional packaged-snack factory in Tamil Nadu. Field orders, production and dispatch share one stock ledger. The monthly reports are generated from the same records used by the factory.
+Batchbook is the order-to-audit desk for Kaveri Snack Works, a fictional snack factory in Tamil Nadu. A supervisor records ingredients against a recipe, counts good packets and posts the batch. The same stock ledger backs order approval, dispatch and the month-end reports.
 
 ## Run the demo
 
@@ -51,7 +51,7 @@ Materials cost ₹4,055. That includes ₹1,725 flour at a moving weighted-avera
 
 | Problem-statement tier | Implemented |
 | --- | --- |
-| Must have | Server-checked roles, product/customer/material/BOM masters, mobile order entry, admin approval and stock reservation, GST invoice PDF, one-step production posting, variance calculation, stock ledger and sales/stock exports |
+| Must have | Server-checked roles, product/customer/material/BOM masters, mobile orders, admin approval and stock reservation, GST invoices as PDFs, saved batch preparation and atomic stock posting, yield and material variances, traceable stock ledger, and sales/stock exports |
 | Should have | Suppliers and material purchases, payment and customer ageing, run cost and margin, outward GST reporting, variance alerts, owner overview |
 | Stretch | Offline queue and retry from an already-open sales form, item-level stock adjustments, full monthly Excel workbook |
 
@@ -61,6 +61,7 @@ Reports cover sales register, sales by customer and product, outward GST, purcha
 
 - Flask with server-rendered Jinja keeps a user action traceable from the form to one Python function. SQLite makes a single-factory demo easy to run and provides transactions for multi-step writes. Openpyxl and ReportLab produce portable, readable exports.
 - Posting dates use IST. Seed opening quantities are dated the first day of that month. The problem supplies no value for opening finished stock, so the seed assumes ₹30 per packet for stock valuation. Production transfers material cost into finished stock. The run absorbs labour and energy for management costing.
+- The material sheet can stay open across a shift. It saves the quantities and the recipe plan as a draft. Posting the finished count commits material issues, packaging waste and finished stock together. The stock check runs again at posting because other batches can consume the same supplies.
 - The benchmark uses the supplied 5% GST rate and a sample HSN, with the customer’s state as place of supply. The PDF uses the fields in Rule 46 as a reference. These are demo documents with illustrative GSTINs and addresses. The GST report is a reconciliation aid for GSTR-1 and GSTR-3B, with no government upload or e-invoicing integration. [CBIC Rule 46](https://taxinformation.cbic.gov.in/content-page/explore-rules/1000136/1000001)
 - This prototype handles full dispatches. An unpaid and undispatched invoice can be cancelled through a full credit note. Returns, partial fulfilment, work in progress, batch expiry and Tally integration are outside this release.
 - An open mobile order form can capture and retry through a connection drop. The queue stays in that browser and is synced under the original account. Fresh login or reopening the form requires a connection. Email sharing opens a draft, with the downloaded PDF attached by the sender.
@@ -71,4 +72,8 @@ Reports cover sales register, sales by customer and product, outward GST, purcha
 python -m unittest discover -s tests -v
 ```
 
-The tests cover the exact benchmark through the business functions and HTTP routes, stock rollback, unit conversions, tax and credit notes, order retry, role restrictions, and the generated spreadsheet and PDF.
+The tests run the benchmark through the business functions and HTTP routes. They check that drafts leave stock alone, recipe edits leave an open batch’s plan intact, a failed posting leaves balances unchanged, and ledger entries link to their source records. They also cover unit conversions, tax, credit notes, order retry, roles and file exports.
+
+## Photograph
+
+The sign-in photo is Keerthiga’s *Murukku or Chakli*, converted to WebP from the Wikimedia preview and displayed cropped. [Source photograph](https://commons.wikimedia.org/wiki/File:Murukku_or_Chakli.jpg) · [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)

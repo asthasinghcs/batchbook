@@ -15,20 +15,22 @@ erDiagram
     ITEM ||--o| RECIPE : has
     RECIPE ||--|{ RECIPE_LINE : uses
     ITEM ||--o{ STOCK_MOVE : records
-    RECIPE ||--o{ RUN : plans
+    RECIPE ||--o{ RUN_DRAFT : plans
+    RUN_DRAFT ||--|{ RUN_DRAFT_LINE : snapshots
+    RUN_DRAFT ||--o| RUN : posts_as
     RUN ||--|{ RUN_LINE : snapshots
     SUPPLIER ||--o{ PURCHASE : supplies
 ```
 
 ### Stock and posting
 
-Physical stock is the sum of signed movements for an item. Receipt, production, dispatch and count adjustments create movements that point to their source document. A date-range ledger gets its running balance from all prior movements. Approval reserves finished packets by counting approved and invoiced orders. Dispatch is the step that physically takes stock out. A credit note releases the reservation when the invoice is unpaid and undispatched. No stock movement is edited or deleted.
+Physical stock is the sum of signed movements for an item. The item ledger links to its purchase receipt, batch, or invoice. Stock counts retain the reason and actor alongside the adjustment. Approval reserves finished packets and dispatch takes them out of physical stock. A credit note releases the reservation for an unpaid, undispatched invoice. Movements are append-only.
 
-SQLite uses an immediate write transaction for the availability check and write so two approvals cannot allocate the same packets. A production run adds its good packets and all material issues, or rolls back the whole transaction. Invoice and dispatch documents are unique per order and invoice. Field orders and browser production posts carry a submission key so a retry keeps one transaction.
+SQLite acquires the write lock before the availability check so two approvals cannot allocate the same packets. Posting a batch rechecks materials and commits the stock movements with the run. A failed post leaves the saved draft available. The draft can link to one posted run. Orders use a client reference to avoid duplicate submissions.
 
 ### BOM and variance
 
-A recipe defines material and packaging quantity per batch, expected packets and tolerance. Posting snapshots the scaled plan and records actual used and wasted quantity per component. A planned 10 L and actual 10.5 L gives +5%. A planned 200 and actual 188 packets gives −6%. Absolute variance must exceed the tolerance to flag. The plan is rounded to the nearest stored unit. Counts use whole units, mass uses grams, and volume uses millilitres. Pack-to-carton conversion uses each product’s carton size.
+A recipe defines material and packaging per batch, expected packets and tolerance. Starting a batch saves a copy of that plan and the raw quantities entered. Posting adds the packaging and yield. Variance compares the total used plus waste with the saved plan. For 10 L planned and 10.5 L used the variance is +5%. For 200 expected and 188 good packets it is −6%. A flag requires a variance strictly outside the tolerance. Storage units are whole pieces, grams or millilitres. A carton converts to its product’s configured packet count.
 
 ### Valuation and accounts
 
