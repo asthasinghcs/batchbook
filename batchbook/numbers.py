@@ -1,6 +1,6 @@
 """Use integer paise for money and integer thousandths for kg and litres."""
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, DecimalException, InvalidOperation
 
 from .db import BusinessError
 
@@ -20,7 +20,7 @@ def scaled(value, factor, label, *, minimum=0, maximum=100_000_000):
         if not minimum <= amount <= maximum:
             raise InvalidOperation
         return int(amount)
-    except (InvalidOperation, TypeError, ValueError):
+    except (DecimalException, TypeError, ValueError):
         raise BusinessError(f"{label} must be a valid amount in the selected unit.") from None
 
 
