@@ -30,7 +30,13 @@ class BusinessWorkflow(unittest.TestCase):
 
     def test_section_five_end_to_end(self):
         inventory.purchase(3, 1, 1, "FLOUR-60", "60", "kg", "45")
-        run = inventory.run(4, 6, "1", "188", ISSUES, "")
+        ref = str(uuid4())
+        draft = inventory.start_run(4, 6, "1", ISSUES, ref)
+        self.assertEqual(inventory.start_run(4, 6, "1", ISSUES, ref), draft)
+        self.assertEqual(inventory.balance(1)[0], 160_000)
+        self.assertEqual(inventory.balance(6)[0], 50)
+        run = inventory.post_run(4, draft, "188", ISSUES, "")
+        self.assertEqual(inventory.post_run(4, draft, "188", ISSUES, ""), run)
         self.assertEqual([inventory.balance(i)[0] for i in range(1, 7)],
                          [120_000, 19_500, 3_800, 306, 21, 238])
         row = db().execute("SELECT * FROM runs WHERE id = ?", (run,)).fetchone()
@@ -67,13 +73,28 @@ class BusinessWorkflow(unittest.TestCase):
         self.assertFalse(seed_demo())
 
     def test_run_failure_keeps_all_balances_and_records_unchanged(self):
+        draft = inventory.start_run(4, 6, "1", ISSUES, str(uuid4()))
         bad = dict(ISSUES)
         bad[5] = ("31", "0", "piece")
         with self.assertRaisesRegex(BusinessError, "has only 30"):
-            inventory.run(4, 6, "1", "188", bad, "")
+            inventory.post_run(4, draft, "188", bad, "")
         self.assertEqual(inventory.balance(6)[0], 50)
         self.assertEqual(inventory.balance(1)[0], 100_000)
         self.assertEqual(db().execute("SELECT COUNT(*) FROM runs").fetchone()[0], 0)
+        self.assertIsNone(inventory.draft_for(draft)["run_id"])
+
+    def test_draft_uses_saved_recipe_when_the_master_changes(self):
+        from batchbook.masters import save_recipe
+
+        draft = inventory.start_run(4, 6, "1", ISSUES, str(uuid4()))
+        save_recipe(3, 6, "250", "3", {"item_1": "80"})
+        revised = {**ISSUES, 1: ("39", "1", "kg")}
+        inventory.revise_materials(4, draft, revised)
+        run = inventory.post_run(4, draft, "188", ISSUES, "")
+        values = db().execute("SELECT planned, used, wasted FROM run_lines WHERE run_id = ? AND item_id = 1", (run,)).fetchone()
+        self.assertEqual(tuple(values), (40_000, 39_000, 1_000))
+        self.assertEqual(inventory.draft_for(draft)["planned_packets"], 200)
+        self.assertIsNotNone(db().execute("SELECT id FROM audit_events WHERE action = 'materials_revised'").fetchone())
 
     def test_credit_note_retains_invoice_and_releases_reservation(self):
         order = sales.submit(2, 2, [(6, "2", "carton")], uuid4())

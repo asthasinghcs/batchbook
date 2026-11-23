@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import csrf, heading, batch_steps, materials_table %}
+{% block title %}Record batch yield{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('factory.runs') }}">Production</a>
+{{ heading('Record batch yield', draft.product ~ ' · Started ' ~ draft.started_on) }}
+{{ batch_steps(2) }}
+<div class="production-layout">
+  <form method="post" class="panel">
+    {{ csrf() }}
+    <header class="panel-heading"><h2>Finished count and packing</h2></header>
+    <div class="padded form-grid two run-identity">
+      <label>Good packets<input type="number" name="good_packets" min="0" step="1" inputmode="numeric" value="{{ request.form.get('good_packets', '') }}" required></label>
+      <label>Run note<input name="notes" maxlength="400" placeholder="Optional" value="{{ request.form.get('notes', '') }}"></label>
+    </div>
+    {% if packaging %}{{ materials_table(packaging, 'planned') }}{% endif %}
+    <div class="panel-footer actions"><button class="button primary">Post batch to stock</button>
+      <a href="{{ url_for('factory.runs') }}" class="button button-quiet">Finish later</a></div>
+  </form>
+  <aside class="batch-paper">
+    <div class="batch-paper-title">Recipe yield</div><p class="batch-paper-number">{{ draft.planned_packets }}</p>
+    <p class="batch-paper-unit">expected packets</p>
+    <dl>{% for item in materials %}<div><dt>{{ item.name }}</dt><dd>{{ (item.used + item.wasted)|qty(item.unit) }} {{ item.unit }}</dd></div>{% endfor %}</dl>
+    <p class="batch-help">Posting deducts use and waste and adds the good packets to finished stock.</p>
+  </aside>
+</div>
+{% if materials %}
+<details class="panel revision" {{ 'open' if request.form.get('action') == 'revise' }}>
+  <summary>Correct recorded materials</summary>
+  <form method="post">{{ csrf() }}<input name="action" type="hidden" value="revise">
+    {{ materials_table(materials, 'planned', true) }}
+    <div class="panel-footer"><button class="button">Save correction</button></div>
+  </form>
+</details>
+{% endif %}
+{% endblock %}

@@ -212,12 +212,14 @@ for (const form of document.querySelectorAll("[data-unit-form]")) {
 const run = document.querySelector("[data-run-form]");
 if (run) {
   const batches = run.elements.batches;
-  const display = run.querySelector("[data-planned-output]");
+  const display = document.querySelector("[data-planned-output]");
+  const product = run.querySelector("[data-batch-product]");
   function showExpected() {
     const expected = Math.round(Math.round(Number(batches.value) * 1000) * Number(run.dataset.planned) / 1000);
     display.textContent = expected ? String(expected) : "—";
   }
   batches.addEventListener("input", showExpected);
+  product.addEventListener("change", () => product.form.requestSubmit());
   showExpected();
 }
 

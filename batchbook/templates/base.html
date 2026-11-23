@@ -8,49 +8,63 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='batchbook.css') }}">
   <script defer src="{{ url_for('static', filename='batchbook.js') }}"></script>
 </head>
-<body>
 {% macro brand() %}
-  <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-  <span>Batchbook</span>
+  <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>Batchbook</span>
 {% endmacro %}
+{% macro nav_item(name, target, current, arguments={}) %}
+  <a href="{{ url_for(target, **arguments) }}"{% if current %} aria-current="page"{% endif %}>{{ name }}</a>
+{% endmacro %}
+<body class="{{ 'role-' ~ g.user.role if g.user else 'session-public' }}">
 <a class="skip-link" href="#content">Skip to content</a>
 {% if g.user %}
   {% set role = g.user.role %}
   {% set endpoint = request.endpoint or '' %}
   <div class="shell">
+    <header class="topbar">
+      <div class="topbar-start">
+        <a class="brand" href="{{ url_for('web.home') }}">{{ brand() }}</a>
+        <span class="topbar-factory">Kaveri Snack Works</span>
+      </div>
+      <form method="post" action="{{ url_for('web.logout') }}" class="identity">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <div class="identity-name"><b>{{ g.user.display_name }}</b><span>{{ role_labels[role] }}</span></div>
+        <button class="button button-small button-quiet" type="submit">Sign out</button>
+      </form>
+    </header>
     <aside class="sidebar">
-      <a class="brand" href="{{ url_for('web.home') }}">{{ brand() }}</a>
-      <div class="factory-label">Kaveri Snack Works</div>
       <nav aria-label="Workspace">
-        {% if role in ['admin', 'owner'] %}<a href="{{ url_for('web.home') }}" {% if endpoint == 'web.home' %}aria-current="page"{% endif %}>Overview</a>{% endif %}
-        {% if role in ['admin', 'sales'] %}<a href="{{ url_for('sales.orders') }}" {% if endpoint in ['sales.orders', 'sales.order', 'sales.new_order'] %}aria-current="page"{% endif %}>{{ 'My orders' if role == 'sales' else 'Orders' }}</a>{% endif %}
-        {% if role in ['admin', 'auditor', 'owner'] %}<a href="{{ url_for('sales.invoices') }}" {% if endpoint in ['sales.invoices', 'sales.invoice'] %}aria-current="page"{% endif %}>Invoices</a>{% endif %}
-        {% if role in ['admin', 'production', 'auditor', 'owner'] %}<a href="{{ url_for('factory.runs') }}" {% if endpoint in ['factory.runs', 'factory.run', 'factory.new_run'] %}aria-current="page"{% endif %}>Production</a>{% endif %}
-        {% if role in ['admin', 'production'] %}<a href="{{ url_for('factory.purchases') }}" {% if endpoint == 'factory.purchases' %}aria-current="page"{% endif %}>Purchases</a>{% endif %}
-        {% if role != 'sales' %}
-          <a href="{{ url_for('factory.stock') }}" {% if endpoint == 'factory.stock' %}aria-current="page"{% endif %}>Stock</a>
-          <a href="{{ url_for('audit.reports') }}" {% if endpoint == 'audit.reports' %}aria-current="page"{% endif %}>Reports</a>
+        {% if role == 'sales' %}
+          {{ nav_item('My orders', 'sales.orders', endpoint in ['sales.orders', 'sales.order']) }}
+          {{ nav_item('New order', 'sales.new_order', endpoint == 'sales.new_order') }}
+        {% else %}
+          {% if role in ['admin', 'owner'] %}{{ nav_item('Factory desk', 'web.home', endpoint == 'web.home') }}{% endif %}
+          <div class="nav-section">
+            <span class="nav-caption">Operations</span>
+            {% if role == 'admin' %}{{ nav_item('Orders', 'sales.orders', endpoint in ['sales.orders', 'sales.order']) }}{% endif %}
+            {{ nav_item('Production', 'factory.runs', endpoint in ['factory.runs', 'factory.run', 'factory.new_run', 'factory.draft']) }}
+            {% if role in ['admin', 'production'] %}{{ nav_item('Purchases', 'factory.purchases', endpoint in ['factory.purchases', 'factory.receipt']) }}{% endif %}
+            {{ nav_item('Stock', 'factory.stock', endpoint in ['factory.stock', 'factory.item_ledger']) }}
+          </div>
+          <div class="nav-section">
+            <span class="nav-caption">Records</span>
+            {% if role in ['admin', 'auditor', 'owner'] %}{{ nav_item('Invoices', 'sales.invoices', endpoint in ['sales.invoices', 'sales.invoice']) }}{% endif %}
+            {{ nav_item('Reports', 'audit.reports', endpoint == 'audit.reports') }}
+            {% if role == 'admin' %}{{ nav_item('Master data', 'factory.master', endpoint == 'factory.master', {'section': 'items'}) }}{% endif %}
+          </div>
         {% endif %}
-        {% if role == 'admin' %}<a href="{{ url_for('factory.master', section='items') }}" {% if endpoint == 'factory.master' %}aria-current="page"{% endif %}>Master data</a>{% endif %}
       </nav>
-      <div class="sidebar-bottom"><span class="factory-label">Tiruchirappalli, Tamil Nadu</span></div>
+      {% if role != 'sales' %}<footer class="sidebar-end">
+        <span>Tiruchirappalli, TN</span>
+        <time datetime="{{ business_date.isoformat() }}">{{ business_date.strftime('%d %b %Y') }} · IST</time>
+      </footer>{% endif %}
     </aside>
-    <div class="workspace">
-      <header class="topbar">
-        <div><span class="role-label">{{ role_labels[role] }}</span><span class="topbar-date">{{ business_date.strftime('%d %b %Y') }}</span></div>
-        <form method="post" action="{{ url_for('web.logout') }}" class="identity">
-          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
-          <span class="identity-name">{{ g.user.display_name }}</span>
-          <button class="button button-small button-quiet" type="submit">Sign out</button>
-        </form>
-      </header>
 {% endif %}
-      <main id="content" class="{{ 'page' if g.user else 'public-page' }}">
-        {% for category, message in get_flashed_messages(with_categories=true) %}
-          <div class="notice {{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</div>
-        {% endfor %}
-        {% block content %}{% endblock %}
-      </main>
-{% if g.user %}</div></div>{% endif %}
+    <main id="content" class="{{ 'page' if g.user else 'public-page' }}">
+      {% for category, message in get_flashed_messages(with_categories=true) %}
+        <div class="notice {{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+    </main>
+{% if g.user %}</div>{% endif %}
 </body>
 </html>

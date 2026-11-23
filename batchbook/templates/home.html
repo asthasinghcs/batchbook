@@ -1,49 +1,62 @@
 {% extends 'base.html' %}
-{% from 'ui.html' import heading, metric, status, empty %}
-{% block title %}Factory overview{% endblock %}
+{% from 'ui.html' import heading, status, empty %}
+{% block title %}Factory desk{% endblock %}
 {% block content %}
-{% call heading('Factory overview', 'Orders, finished stock and collections at a glance.') %}
-  {% if g.user.role == 'admin' %}<a class="button primary" href="{{ url_for('sales.orders', status='submitted') }}">Review orders</a>
-  {% else %}<a class="button primary" href="{{ url_for('audit.reports') }}">Open reports</a>{% endif %}
-{% endcall %}
-<section class="metrics" aria-label="Factory totals">
-  {{ metric('Orders today', today_count, 'Across the sales team') }}
-  {{ metric('Awaiting review', pending, 'Submitted orders', 'pending' if pending else '') }}
-  {{ metric('Total receivables', '₹' ~ (due|money), 'Across open invoices') }}
+{% set admin = g.user.role == 'admin' %}
+<header class="page-heading desk-heading">
+  <div><p class="work-date">{{ business_date.strftime('%A, %d %B') }}</p><h1>Factory desk</h1></div>
+  <div class="actions">
+    {% if admin %}<a class="button" href="{{ url_for('factory.purchases') }}">Receive materials</a>
+      <a class="button primary" href="{{ url_for('factory.new_run') }}">Start a batch</a>
+    {% else %}<a class="button primary" href="{{ url_for('audit.reports') }}">Month-end reports</a>{% endif %}
+  </div>
+</header>
+<section class="desk-totals" aria-label="Factory at a glance">
+  <div><span>Orders today</span><strong>{{ today_count }}</strong></div>
+  <div><span>Awaiting approval</span><strong>{{ pending }}</strong></div>
+  <div><span>Ready to dispatch</span><strong>{{ to_dispatch }}</strong></div>
+  <div><span>Outstanding invoices</span><strong>₹{{ due|money }}</strong></div>
 </section>
-<div class="split">
+<div class="desk-columns">
   <section class="panel">
-    <header class="panel-heading"><h2>Recent orders</h2>{% if g.user.role == 'admin' %}<a href="{{ url_for('sales.orders') }}">All orders</a>{% endif %}</header>
+    <header class="panel-heading"><h2>{{ 'Order queue' if admin else 'Recent orders' }}</h2>
+      {% if admin %}<a href="{{ url_for('sales.orders') }}">All orders</a>{% endif %}</header>
     {% if orders %}
-    <div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Status</th></tr></thead>
-    <tbody>{% for row in orders %}<tr>
-      <td>{% if g.user.role == 'admin' %}<a href="{{ url_for('sales.order', order_id=row.id) }}">SO-{{ '%04d'|format(row.id) }}</a>
-        {% else %}SO-{{ '%04d'|format(row.id) }}{% endif %}</td>
-      <td>{{ row.customer }}<small>{{ row.salesman }}</small></td><td>{{ status(row.status) }}</td>
-    </tr>{% endfor %}</tbody></table></div>
-    {% else %}{{ empty('No orders have been submitted.') }}{% endif %}
+      <ul class="record-list">
+      {% for order in orders %}<li>
+        <div>{% if admin %}<a href="{{ url_for('sales.order', order_id=order.id) }}">{{ order.customer }}</a>
+          {% else %}<strong>{{ order.customer }}</strong>{% endif %}
+          <small>SO-{{ '%04d'|format(order.id) }} · {{ order.salesman }}</small></div>
+        <div class="record-amount">{{ order.packets }} packets</div>{{ status(order.status) }}
+      </li>{% endfor %}</ul>
+    {% else %}
+      <div class="desk-empty"><strong>{{ 'The queue is clear' if admin else 'No orders yet' }}</strong>
+        <p>{{ 'New orders from the field appear here for review.' if admin else 'Orders appear as the field team submits them.' }}</p></div>
+    {% endif %}
   </section>
   <section class="panel">
-    <header class="panel-heading"><h2>Finished stock</h2><a href="{{ url_for('factory.stock') }}">Stock balances</a></header>
-    {% if finished %}
-    <div class="table-wrap"><table><thead><tr><th>Product</th><th class="number">On hand</th><th class="number">Available</th></tr></thead>
-    <tbody>{% for item in finished %}<tr><td>{{ item.name }}<small>{{ item.sku }}</small></td>
-      <td class="number">{{ item.on_hand }}</td><td class="number">{{ item.available }}</td>
-    </tr>{% endfor %}</tbody></table></div>
-    {% else %}{{ empty('Add a finished item to track its stock.') }}{% endif %}
+    <header class="panel-heading"><h2>Finished stock</h2><a href="{{ url_for('factory.stock') }}">All stock</a></header>
+    {% if finished %}<ul class="record-list shelf-list">
+      {% for item in finished %}<li>
+        <div><a href="{{ url_for('factory.item_ledger', item_id=item.id) }}">{{ item.name }}</a>
+          <small>{{ item.on_hand }} on hand · {{ item.on_hand - item.available }} reserved</small></div>
+        <div class="shelf-count"><strong>{{ item.available }}</strong><small>available</small></div>
+      </li>{% endfor %}</ul>
+    {% else %}{{ empty('Finished products will appear here as they are added.') }}{% endif %}
   </section>
 </div>
 <section class="panel">
-  <header class="panel-heading"><h2>Production signals</h2><a href="{{ url_for('factory.runs') }}">All runs</a></header>
+  <header class="panel-heading"><h2>Recent production</h2><a href="{{ url_for('factory.runs') }}">Batch register</a></header>
   {% if runs %}
-  <div class="table-wrap"><table><thead><tr><th>Run</th><th>Product</th><th>Yield</th><th>Variances over tolerance</th><th class="number">Cost / packet</th><th class="number">Margin / packet</th></tr></thead>
-  <tbody>{% for row in runs %}<tr>
-    <td><a href="{{ url_for('factory.run', run_id=row.id) }}">RUN-{{ '%04d'|format(row.id) }}</a></td>
-    <td>{{ row.product }}</td><td>{{ row.actual_packets }} / {{ row.planned_packets }} <small>{{ row.yield_pct }}</small></td>
-    <td>{% if row.alerts %}<span class="status status-short">{{ row.alerts }} to review</span>{% else %}Within tolerance{% endif %}</td>
-    <td class="number">{{ '₹' ~ (row.cost|money) if row.cost is not none else '—' }}</td>
-    <td class="number">{{ '₹' ~ ((row.price_paise - row.cost)|money) if row.cost is not none else '—' }}</td>
-  </tr>{% endfor %}</tbody></table></div>
-  {% else %}{{ empty('Production variances and costs appear when a run is posted.') }}{% endif %}
+    <div class="table-wrap"><table><thead><tr><th>Batch</th><th>Product</th><th>Good / planned</th><th>Variances</th><th class="number">Cost per packet</th></tr></thead>
+    <tbody>{% for run in runs %}<tr>
+      <td><a href="{{ url_for('factory.run', run_id=run.id) }}">RUN-{{ '%04d'|format(run.id) }}</a></td><td>{{ run.product }}</td>
+      <td>{{ run.actual_packets }} / {{ run.planned_packets }} <small>{{ run.yield_pct }}</small></td>
+      <td>{% if run.alerts %}<span class="status status-short">{{ run.alerts }} outside tolerance</span>{% else %}Within tolerance{% endif %}</td>
+      <td class="number">{{ '₹' ~ (run.cost|money) if run.cost is not none else '—' }}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}
+    <div class="desk-empty"><strong>No posted batches yet</strong><p>Yield and material variances appear after a batch is posted.</p></div>
+  {% endif %}
 </section>
 {% endblock %}

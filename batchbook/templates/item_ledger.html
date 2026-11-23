@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import heading, empty %}
+{% block title %}{{ item.name }} ledger{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('factory.stock') }}">Stock</a>
+{% call heading(item.name ~ ' ledger', item.sku ~ ' · On hand ' ~ (closing|qty(item.unit)) ~ ' ' ~ item.unit) %}
+  <a class="button" href="{{ url_for('audit.reports', report='ledger', item_id=item.id) }}">Date range and exports</a>
+{% endcall %}
+<section class="panel">
+  <header class="panel-heading"><h2>Posted movements</h2></header>
+  {% if moves %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Date</th><th>Source</th><th>Posted by</th><th class="number">Change ({{ item.unit }})</th><th class="number">Balance</th><th class="number">Value change</th></tr></thead>
+    <tbody>{% for move in moves %}
+    <tr>
+      <td>{{ move.on_date }}</td>
+      <td>{% if move.source == 'purchase' %}
+          <a href="{{ url_for('factory.receipt', receipt_id=move.source_id) }}">{{ move.reference }}</a><small>Purchase receipt</small>
+        {% elif move.source == 'production' %}
+          <a href="{{ url_for('factory.run', run_id=move.source_id) }}">RUN-{{ '%04d'|format(move.source_id) }}</a><small>{{ 'Finished output' if move.quantity > 0 else 'Material issue' }}</small>
+        {% elif move.source == 'dispatch' %}
+          {% if g.user.role != 'production' %}<a href="{{ url_for('sales.invoice', invoice_id=move.invoice_id) }}">{{ move.number }}</a>
+          {% else %}{{ move.number }}{% endif %}<small>Dispatch</small>
+        {% elif move.source == 'adjustment' %}{{ move.reason }}<small>Adjustment {{ move.source_id }}</small>
+        {% else %}Opening balance{% endif %}</td>
+      <td>{{ move.display_name }}</td>
+      <td class="number {{ 'positive' if move.quantity > 0 }}">{{ '+' if move.quantity > 0 }}{{ move.quantity|qty(item.unit) }}</td>
+      <td class="number">{{ move.running|qty(item.unit) }}</td><td class="number">₹{{ move.value_paise|money }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}{{ empty('There are no movements for this item yet.') }}{% endif %}
+</section>
+{% endblock %}

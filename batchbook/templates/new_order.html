@@ -16,8 +16,7 @@
 {% endmacro %}
 {% block title %}New order{% endblock %}
 {% block content %}
-<a class="back-link" href="{{ url_for('sales.orders') }}">My orders</a>
-{{ heading('New order', 'Prices come from the factory price list. Stock is checked during approval.') }}
+{{ heading('New order') }}
 <aside id="sync-status" class="notice" hidden data-account="{{ g.user.id }}" data-token="{{ url_for('sales.sync_token') }}" data-sync="{{ url_for('sales.sync') }}" aria-live="polite">
   <span data-sync-message></span><button type="button" class="button button-small" data-sync-now>Retry sync</button>
   <button type="button" class="button button-small button-quiet" data-clear-queue>Discard offline queue</button>

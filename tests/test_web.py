@@ -51,17 +51,25 @@ class WebWorkflow(unittest.TestCase):
                                                   "amount": 60, "unit": "kg", "rate": 45})
         self.assertIn(b"Material stock updated", receipt.data)
         self.assertIn(b"Flour used", production.get("/production/new").data)
-        amounts = {1: (40000, 0, "g"), 2: (10.5, 0, "L"), 3: (1.2, 0, "kg"),
-                   4: (188, 6, "piece"), 5: (9, 0, "piece")}
-        payload = {"product_id": 6, "batches": 1, "good_packets": 188, "client_ref": str(uuid4())}
-        for item, (used, wasted, unit) in amounts.items():
-            payload.update({f"used_{item}": used, f"waste_{item}": wasted, f"unit_{item}": unit})
-        run = self.post(production, "/production/new", payload)
+        self.assertEqual(production.get("/static/murukku.webp", buffered=True).status_code, 200)
+        prep = {"product_id": 6, "batches": 1, "client_ref": str(uuid4())}
+        for item, (used, unit) in {1: (40000, "g"), 2: (10.5, "L"), 3: (1.2, "kg")}.items():
+            prep.update({f"used_{item}": used, f"unit_{item}": unit})
+        draft = self.post(production, "/production/new", prep)
+        self.assertEqual(draft.request.path, "/production/drafts/1")
+        self.assertIn(b"Good packets", draft.data)
+        self.assertIn(b"Awaiting yield", production.get("/production").data)
+        pack = {"good_packets": 188, "used_4": 188, "waste_4": 6, "unit_4": "piece", "used_5": 9, "unit_5": "piece"}
+        run = self.post(production, "/production/drafts/1", pack)
         self.assertIn(b"-6.0%", run.data)
         self.assertIn(b"+5.0%", run.data)
         self.assertIn(b"238", admin.get("/stock").data)
-        duplicate = self.post(production, "/production/new", payload)
+        duplicate = self.post(production, "/production/new", prep)
         self.assertIn(b"RUN-0001", duplicate.data)
+        flour_history = production.get("/stock/1").data
+        self.assertIn(b'href="/purchases/1"', flour_history)
+        self.assertIn(b'href="/production/1"', flour_history)
+        self.assertIn(b"120", flour_history)
         order_a = self.post(sales_a, "/orders/new", {"customer_id": 1, "product_id": 6, "count": 150,
                                                    "unit": "packet", "client_ref": str(uuid4())})
         self.assertIn(b"SO-0001", order_a.data)
@@ -75,6 +83,7 @@ class WebWorkflow(unittest.TestCase):
         self.assertEqual(pdf.status_code, 200)
         self.assertTrue(pdf.data.startswith(b"%PDF"))
         self.assertIn(b"Finished stock updated", self.post(admin, "/invoices/1/dispatch", {}).data)
+        self.assertIn(b'href="/invoices/1"', admin.get("/stock/6").data)
         sync = sales_b.get("/orders/sync-token").json
         queued = {"account": sync["account"], "customer_id": "2", "lines": [["6", "120", "packet"]],
                   "client_ref": str(uuid4())}

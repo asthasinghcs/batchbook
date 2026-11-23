@@ -75,9 +75,7 @@ CREATE TABLE IF NOT EXISTS runs (
     labour_paise INTEGER NOT NULL DEFAULT 0 CHECK (labour_paise >= 0),
     energy_paise INTEGER NOT NULL DEFAULT 0 CHECK (energy_paise >= 0),
     notes TEXT NOT NULL DEFAULT '',
-    actor_id INTEGER NOT NULL REFERENCES users(id),
-    client_ref TEXT,
-    UNIQUE(actor_id, client_ref)
+    actor_id INTEGER NOT NULL REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS run_lines (
@@ -88,6 +86,28 @@ CREATE TABLE IF NOT EXISTS run_lines (
     wasted INTEGER NOT NULL CHECK (wasted >= 0),
     cost_paise INTEGER NOT NULL CHECK (cost_paise >= 0),
     PRIMARY KEY (run_id, item_id)
+);
+
+CREATE TABLE IF NOT EXISTS run_drafts (
+    id INTEGER PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES items(id),
+    actor_id INTEGER NOT NULL REFERENCES users(id),
+    started_on TEXT NOT NULL,
+    batch_milli INTEGER NOT NULL CHECK (batch_milli > 0),
+    planned_packets INTEGER NOT NULL CHECK (planned_packets > 0),
+    tolerance_bp INTEGER NOT NULL,
+    client_ref TEXT NOT NULL,
+    run_id INTEGER UNIQUE REFERENCES runs(id),
+    UNIQUE(actor_id, client_ref)
+);
+
+CREATE TABLE IF NOT EXISTS run_draft_lines (
+    draft_id INTEGER NOT NULL REFERENCES run_drafts(id),
+    item_id INTEGER NOT NULL REFERENCES items(id),
+    planned INTEGER NOT NULL CHECK (planned >= 0),
+    used INTEGER NOT NULL CHECK (used >= 0),
+    wasted INTEGER NOT NULL CHECK (wasted >= 0),
+    PRIMARY KEY (draft_id, item_id)
 );
 
 CREATE TABLE IF NOT EXISTS sales_orders (

@@ -16,3 +16,31 @@
   <span class="variance {{ 'flagged' if result[1] }}">{{ result[0] or '—' }}</span>
   {% if result[1] %}<span class="status status-short">Review</span>{% endif %}
 {% endmacro %}
+{% macro batch_steps(current) %}
+  <ol class="batch-steps" aria-label="Batch posting steps">
+    {% for label in ['Record materials', 'Count and pack', 'Posted to stock'] %}
+      <li class="{{ 'passed' if loop.index < current }}"{% if loop.index == current %} aria-current="step"{% endif %}>
+        <span aria-hidden="true">{{ '✓' if loop.index < current else loop.index }}</span>{{ label }}
+      </li>
+    {% endfor %}
+  </ol>
+{% endmacro %}
+{% macro materials_table(items, plan_field, revision=false) %}
+  <div class="table-wrap"><table class="materials-table">
+    <thead><tr><th scope="col">Material</th><th scope="col">{{ 'Per batch' if plan_field == 'per_batch' else 'Batch plan' }}</th>
+      <th scope="col">Used</th><th scope="col">Waste</th><th scope="col">Unit</th></tr></thead>
+    <tbody>{% for item in items %}
+      {% set use_form = (request.form.get('action') == 'revise') if revision else (request.form.get('action') != 'revise') %}
+      {% set old_used = (item.used|qty(item.unit)) if revision else '' %}
+      {% set old_waste = (item.wasted|qty(item.unit)) if revision else '0' %}
+      <tr>
+        <th scope="row">{{ item.name }}<small>{{ item.on_hand|qty(item.unit) }} {{ item.unit }} in stock</small></th>
+        <td>{{ item[plan_field]|qty(item.unit) }} {{ item.unit }}</td>
+        <td><input type="number" name="used_{{ item.id }}" min="0" step="any" inputmode="decimal" aria-label="{{ item.name }} used" value="{{ request.form.get('used_' ~ item.id, old_used) if use_form else old_used }}" required></td>
+        <td><input type="number" name="waste_{{ item.id }}" min="0" step="any" inputmode="decimal" aria-label="{{ item.name }} waste" value="{{ request.form.get('waste_' ~ item.id, old_waste) if use_form else old_waste }}"></td>
+        <td><select name="unit_{{ item.id }}" aria-label="{{ item.name }} unit">
+          {% for unit in item.units %}<option value="{{ unit }}" {{ 'selected' if unit == (request.form.get('unit_' ~ item.id, item.unit) if use_form else item.unit) }}>{{ unit }}</option>{% endfor %}
+        </select></td>
+      </tr>{% endfor %}
+    </tbody></table></div>
+{% endmacro %}

@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import heading %}
+{% block title %}{{ receipt.reference }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('factory.item_ledger', item_id=receipt.item_id) }}">{{ receipt.item }} ledger</a>
+{% call heading(receipt.reference, 'Purchase receipt · ' ~ receipt.on_date) %}
+  {% if g.user.role in ['admin', 'production'] %}<a class="button" href="{{ url_for('factory.purchases') }}">All purchases</a>{% endif %}
+{% endcall %}
+<section class="panel receipt-record">
+  <header class="panel-heading"><h2>{{ receipt.supplier }}</h2></header>
+  <dl class="padded facts"><div><dt>Material</dt><dd>{{ receipt.item }}</dd></div>
+    <div><dt>Received</dt><dd>{{ receipt.quantity|qty(receipt.unit) }} {{ receipt.unit }}</dd></div>
+    <div><dt>Rate per {{ receipt.unit }}</dt><dd>₹{{ receipt.rate_paise|money }}</dd></div>
+    <div><dt>Posted by</dt><dd>{{ receipt.display_name }}</dd></div>
+    <div class="fact-total"><dt>Receipt value</dt><dd>₹{{ receipt.total_paise|money }}</dd></div>
+  </dl>
+</section>
+{% endblock %}

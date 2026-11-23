@@ -133,9 +133,12 @@ def home():
     connection = db()
     date = today().isoformat()
     work = connection.execute(
-        """SELECT o.*, c.name AS customer, u.display_name AS salesman
+        """SELECT o.*, c.name AS customer, u.display_name AS salesman,
+                  (SELECT SUM(l.packets) FROM order_lines l WHERE l.order_id = o.id) AS packets
            FROM sales_orders o JOIN customers c ON c.id = o.customer_id JOIN users u ON u.id = o.salesman_id
-           ORDER BY o.id DESC LIMIT 6"""
+           WHERE (? <> 'admin' OR o.status IN ('submitted', 'approved', 'invoiced'))
+           ORDER BY o.id DESC LIMIT 6""",
+        (role,),
     ).fetchall()
     finished = []
     for product in connection.execute("SELECT * FROM items WHERE kind = 'finished' ORDER BY name"):
@@ -148,6 +151,7 @@ def home():
     ).fetchone()[0]
     today_count = connection.execute("SELECT COUNT(*) FROM sales_orders WHERE on_date = ?", (date,)).fetchone()[0]
     pending = connection.execute("SELECT COUNT(*) FROM sales_orders WHERE status = 'submitted'").fetchone()[0]
+    to_dispatch = connection.execute("SELECT COUNT(*) FROM sales_orders WHERE status = 'invoiced'").fetchone()[0]
     runs = []
     for run in connection.execute(
         """SELECT r.*, i.name AS product, i.price_paise FROM runs r JOIN items i ON i.id = r.product_id
@@ -158,4 +162,4 @@ def home():
         flagged = sum(variance(line["used"] + line["wasted"], line["planned"], run["tolerance_bp"])[1] for line in issues)
         runs.append(dict(run, yield_pct=yield_pct, alerts=flagged + int(alert), cost=inventory.packet_cost(run)))
     return render_template("home.html", orders=work, finished=finished, due=due, today_count=today_count,
-                           pending=pending, runs=runs)
+                           pending=pending, to_dispatch=to_dispatch, runs=runs)

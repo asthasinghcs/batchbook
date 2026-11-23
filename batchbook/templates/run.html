@@ -1,27 +1,43 @@
 {% extends 'base.html' %}
-{% from 'ui.html' import csrf, heading, metric, check %}
+{% from 'ui.html' import csrf, heading, metric, check, batch_steps %}
 {% block title %}RUN-{{ '%04d'|format(run.id) }}{% endblock %}
 {% block content %}
 <a class="back-link" href="{{ url_for('factory.runs') }}">Production runs</a>
-{% call heading('RUN-' ~ ('%04d'|format(run.id)), run.product ~ ' · ' ~ run.on_date ~ ' · ' ~ run.operator) %}
-  <a class="button" href="{{ url_for('audit.reports', report='ledger', start=run.on_date, end=run.on_date) }}">Stock movements</a>
+{% call heading(run.product, 'RUN-' ~ ('%04d'|format(run.id)) ~ ' · ' ~ run.on_date ~ ' · ' ~ run.operator) %}
+  <a class="button" href="#stock-impact">Stock movements</a>
 {% endcall %}
+{{ batch_steps(3) }}
+{% set overhead = run.labour_paise + run.energy_paise %}
 <section class="metrics" aria-label="Run totals">
   {{ metric('Expected output', run.planned_packets, 'Packets from the recipe') }}
   {{ metric('Good output', run.actual_packets, (yield_variance[0] or '—') ~ ' vs expected', 'pending' if yield_variance[1] else '') }}
-  {{ metric('Cost per good packet', '₹' ~ (unit_cost|money) if unit_cost is not none else '—',
-    '₹' ~ ((run.price_paise - unit_cost)|money) ~ ' margin at list price' if unit_cost is not none else 'No good output') }}
+  {{ metric('Cost per good packet' if overhead else 'Material cost per good packet', '₹' ~ (unit_cost|money) if unit_cost is not none else '—',
+    ('₹' ~ ((run.price_paise - unit_cost)|money) ~ ' margin at list price' if overhead else 'Overheads pending') if unit_cost is not none else 'No good output') }}
 </section>
-<section class="panel">
-  <header class="panel-heading"><h2>Planned vs actual</h2><span class="muted">{{ (run.tolerance_bp / 100)|round(2) }}% tolerance</span></header>
-  <div class="table-wrap"><table><thead><tr><th>Measure</th><th>Unit</th><th class="number">Planned</th><th class="number">Used</th><th class="number">Waste</th><th class="number">Actual</th><th>Variance</th><th class="number">Material cost</th></tr></thead>
-    <tbody><tr><td><strong>Yield</strong></td><td>packet</td><td class="number">{{ run.planned_packets }}</td><td class="number">—</td>
-      <td class="number">—</td><td class="number">{{ run.actual_packets }}</td><td>{{ check(yield_variance) }}</td><td class="number">—</td></tr>
-    {% for line in lines %}<tr><td>{{ line.name }}</td><td>{{ line.unit }}</td><td class="number">{{ line.planned|qty(line.unit) }}</td>
-      <td class="number">{{ line.used|qty(line.unit) }}</td><td class="number">{{ line.wasted|qty(line.unit) }}</td>
-      <td class="number">{{ line.total|qty(line.unit) }}</td><td>{{ check(line.variance) }}</td><td class="number">₹{{ line.cost_paise|money }}</td></tr>{% endfor %}</tbody>
-  </table></div>
-</section>
+<div class="batch-results">
+  <section class="panel" id="plan-comparison">
+    <header class="panel-heading"><h2>Planned vs actual</h2><span class="muted">±{{ (run.tolerance_bp / 100)|round(2) }}% tolerance</span></header>
+    <div class="table-wrap"><table><thead><tr><th>Measure</th><th class="number">Planned</th><th class="number">Actual</th><th>Variance</th></tr></thead>
+      <tbody><tr><td><strong>Good packets</strong></td><td class="number">{{ run.planned_packets }}</td>
+        <td class="number">{{ run.actual_packets }}</td><td>{{ check(yield_variance) }}</td></tr>
+      {% for line in lines %}<tr><td>{{ line.name }}<small>{{ line.unit }}</small></td>
+        <td class="number">{{ line.planned|qty(line.unit) }}</td>
+        <td class="number">{{ line.total|qty(line.unit) }}{% if line.wasted %}<small>{{ line.used|qty(line.unit) }} used · {{ line.wasted|qty(line.unit) }} waste</small>{% endif %}</td>
+        <td>{{ check(line.variance) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  <section class="panel" id="stock-impact">
+    <header class="panel-heading"><h2>Stock after this batch</h2></header>
+    {% if movements %}
+    <div class="table-wrap"><table><thead><tr><th>Item</th><th class="number">Movement</th><th class="number">Balance</th></tr></thead>
+      <tbody>{% for move in movements %}
+        <tr><td><a href="{{ url_for('factory.item_ledger', item_id=move.item_id) }}">{{ move.name }}</a><small>{{ move.unit }}</small></td>
+          <td class="number {{ 'positive' if move.quantity > 0 }}">{{ '+' if move.quantity > 0 }}{{ move.quantity|qty(move.unit) }}</td>
+          <td class="number"><strong>{{ move.after|qty(move.unit) }}</strong><small>from {{ (move.after - move.quantity)|qty(move.unit) }}</small></td></tr>
+      {% endfor %}</tbody></table></div>
+    {% else %}<p class="padded muted">No material or output was posted for this batch.</p>{% endif %}
+  </section>
+</div>
 <div class="split">
   <section class="panel">
     <header class="panel-heading"><h2>Run costing</h2></header>
@@ -31,6 +47,9 @@
       <div><dt>Gas and power</dt><dd>₹{{ run.energy_paise|money }}</dd></div>
       <div class="fact-total"><dt>Total run cost</dt><dd>₹{{ (run.material_paise + run.labour_paise + run.energy_paise)|money }}</dd></div>
     </dl>
+    <details class="padded cost-detail"><summary>Material cost breakdown</summary>
+      <dl class="facts">{% for line in lines %}<div><dt>{{ line.name }}</dt><dd>₹{{ line.cost_paise|money }}</dd></div>{% endfor %}</dl>
+    </details>
     {% if run.notes %}<p class="padded note">{{ run.notes }}</p>{% endif %}
   </section>
   {% if operator %}

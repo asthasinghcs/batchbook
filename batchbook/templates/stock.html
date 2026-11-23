@@ -17,7 +17,7 @@
         <tbody>{% for item in records %}<tr>
           <td>{{ item.name }}<small>{{ item.sku }}</small></td><td>{{ item.unit }}</td><td class="number">{{ item.on_hand|qty(item.unit) }}</td>
           {% if kind == 'finished' %}<td class="number">{{ item.reserved }}</td><td class="number">{{ item.available }}</td>{% endif %}
-          <td class="number">₹{{ item.value|money }}</td><td><a href="{{ url_for('audit.reports', report='ledger', item_id=item.id) }}">View ledger</a></td>
+          <td class="number">₹{{ item.value|money }}</td><td><a href="{{ url_for('factory.item_ledger', item_id=item.id) }}">View ledger</a></td>
         </tr>{% endfor %}</tbody></table></div>
     {% else %}{{ empty('No items in this category.') }}{% endif %}
   </section>

@@ -85,44 +85,105 @@ def recipe_for(product_id):
     return recipe, lines
 
 
-def run(actor, product_id, batches, good_packets, amounts, notes, client_ref=None):
-    if client_ref:
-        try:
-            client_ref = str(UUID(client_ref))
-        except ValueError:
-            raise BusinessError("Refresh the run form and try again.") from None
+def start_run(actor, product_id, batches, amounts, client_ref):
+    try:
+        client_ref = str(UUID(client_ref))
+    except (ValueError, TypeError, AttributeError):
+        raise BusinessError("Refresh the batch form and try again.") from None
     batch_milli = scaled(batches, 1000, "Batches", minimum=1, maximum=100_000)
+    with atomic() as connection:
+        existing = connection.execute(
+            "SELECT id FROM run_drafts WHERE actor_id = ? AND client_ref = ?", (actor, client_ref)
+        ).fetchone()
+        if existing:
+            return existing["id"]
+        recipe, lines = recipe_for(product_id)
+        planned = round_ratio(recipe["expected_packets"] * batch_milli, 1000)
+        if planned == 0:
+            raise BusinessError("This batch size needs to yield at least one planned packet.")
+        draft_id = connection.execute(
+            """INSERT INTO run_drafts
+               (product_id, actor_id, started_on, batch_milli, planned_packets, tolerance_bp, client_ref)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (product_id, actor, today().isoformat(), batch_milli, planned, recipe["tolerance_bp"], client_ref),
+        ).lastrowid
+        for item in lines:
+            used, wasted = recorded_amounts(item, amounts) if item["kind"] == "raw" else (0, 0)
+            if item["kind"] == "raw":
+                issue_cost(item, used + wasted)
+            standard = round_ratio(item["per_batch"] * batch_milli, 1000)
+            connection.execute(
+                "INSERT INTO run_draft_lines VALUES (?, ?, ?, ?, ?)", (draft_id, item["id"], standard, used, wasted)
+            )
+        audit("draft", draft_id, "started", actor, {"product_id": product_id, "expected_packets": planned})
+        return draft_id
+
+
+def draft_for(draft_id):
+    return required(
+        """SELECT d.*, i.name AS product FROM run_drafts d
+           JOIN items i ON i.id = d.product_id WHERE d.id = ?""",
+        (draft_id,),
+        "That batch could not be found.",
+    )
+
+
+def draft_lines(draft_id):
+    return db().execute(
+        """SELECT i.*, d.planned, d.used, d.wasted
+           FROM run_draft_lines d JOIN items i ON i.id = d.item_id WHERE d.draft_id = ?
+           ORDER BY i.kind DESC, i.id""",
+        (draft_id,),
+    ).fetchall()
+
+
+def recorded_amounts(item, amounts):
+    used, wasted, unit = amounts.get(item["id"], ("", "", item["unit"]))
+    return quantity(used, unit, item, allow_zero=True), quantity(wasted or "0", unit, item, allow_zero=True)
+
+
+def revise_materials(actor, draft_id, amounts):
+    with atomic() as connection:
+        if draft_for(draft_id)["run_id"]:
+            raise BusinessError("This batch has already been posted.")
+        changes = []
+        for item in draft_lines(draft_id):
+            if item["kind"] != "raw":
+                continue
+            used, wasted = recorded_amounts(item, amounts)
+            issue_cost(item, used + wasted)
+            if (used, wasted) != (item["used"], item["wasted"]):
+                changes.append({"item_id": item["id"], "before": [item["used"], item["wasted"]], "after": [used, wasted]})
+                connection.execute(
+                    "UPDATE run_draft_lines SET used = ?, wasted = ? WHERE draft_id = ? AND item_id = ?",
+                    (used, wasted, draft_id, item["id"]),
+                )
+        if changes:
+            audit("draft", draft_id, "materials_revised", actor, {"changes": changes})
+
+
+def post_run(actor, draft_id, good_packets, amounts, notes):
     actual = scaled(good_packets, 1, "Good packets")
     notes = notes.strip()
     if len(notes) > 400:
         raise BusinessError("Keep the run note within 400 characters.")
     with atomic() as connection:
-        if client_ref:
-            existing = connection.execute(
-                "SELECT id FROM runs WHERE actor_id = ? AND client_ref = ?", (actor, client_ref)
-            ).fetchone()
-            if existing:
-                return existing["id"]
-        recipe, lines = recipe_for(product_id)
-        planned = round_ratio(recipe["expected_packets"] * batch_milli, 1000)
-        if planned == 0:
-            raise BusinessError("This batch size needs to yield at least one planned packet.")
+        draft = draft_for(draft_id)
+        if draft["run_id"]:
+            return draft["run_id"]
         consumption = []
-        for item in lines:
-            used_text, waste_text, unit = amounts.get(item["id"], ("", "", item["unit"]))
-            used = quantity(used_text, unit, item, allow_zero=True)
-            wasted = quantity(waste_text or "0", unit, item, allow_zero=True)
-            standard = round_ratio(item["per_batch"] * batch_milli, 1000)
+        for item in draft_lines(draft_id):
+            used, wasted = (item["used"], item["wasted"]) if item["kind"] == "raw" else recorded_amounts(item, amounts)
             cost = issue_cost(item, used + wasted)
-            consumption.append((item["id"], standard, used, wasted, cost))
+            consumption.append((item["id"], item["planned"], used, wasted, cost))
         material_cost = sum(line[4] for line in consumption)
         run_id = connection.execute(
             """INSERT INTO runs
                (product_id, on_date, batch_milli, planned_packets, actual_packets, tolerance_bp,
-                material_paise, notes, actor_id, client_ref)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (product_id, today().isoformat(), batch_milli, planned, actual, recipe["tolerance_bp"],
-             material_cost, notes, actor, client_ref),
+                material_paise, notes, actor_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (draft["product_id"], today().isoformat(), draft["batch_milli"], draft["planned_packets"],
+             actual, draft["tolerance_bp"], material_cost, notes, actor),
         ).lastrowid
         for item_id, standard, used, wasted, cost in consumption:
             connection.execute(
@@ -132,8 +193,9 @@ def run(actor, product_id, batches, good_packets, amounts, notes, client_ref=Non
             if used + wasted:
                 move(item_id, -(used + wasted), -cost, "production", run_id, actor)
         if actual:
-            move(product_id, actual, material_cost, "production", run_id, actor)
-        audit("run", run_id, "posted", actor, {"expected_packets": planned, "good_packets": actual})
+            move(draft["product_id"], actual, material_cost, "production", run_id, actor)
+        connection.execute("UPDATE run_drafts SET run_id = ? WHERE id = ?", (run_id, draft_id))
+        audit("run", run_id, "posted", actor, {"draft_id": draft_id, "good_packets": actual})
         return run_id
 
 

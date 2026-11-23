@@ -10,8 +10,16 @@
     <form method="post" action="{{ url_for('sales.issue_invoice', order_id=order.id) }}">{{ csrf() }}<button class="button primary">Raise GST invoice</button></form>
   {% endif %}
 {% endcall %}
+{% if order.status in ['submitted', 'approved', 'invoiced', 'dispatched'] %}
+  {% set stages = ['submitted', 'approved', 'invoiced', 'dispatched'] %}
+  {% set current_stage = stages.index(order.status) %}
+  <ol class="batch-steps order-steps" aria-label="Order progress">
+    {% for stage in stages %}<li class="{{ 'passed' if loop.index0 < current_stage }}"{% if stage == order.status %} aria-current="step"{% endif %}>
+      <span aria-hidden="true">{{ '✓' if loop.index0 < current_stage else loop.index }}</span>{{ stage|capitalize }}</li>{% endfor %}
+  </ol>
+{% endif %}
 {% if admin and order.status == 'submitted' %}
-  {% for line in lines if line.short %}<div class="notice warning"><strong>{{ line.short }}-packet shortage</strong> for {{ line.name }}. {{ line.available }} packets available for this order.</div>{% endfor %}
+  {% for line in lines if line.short %}<div class="notice warning"><strong>{{ line.short }}-packet shortage</strong> for {{ line.name }}. There are {{ line.available }} packets available against {{ line.packets }} requested. Reduce the quantity with the customer’s agreement or wait for stock.</div>{% endfor %}
 {% endif %}
 <section class="panel">
   <header class="panel-heading"><h2>Order lines</h2><span class="muted">{{ order.salesman }}</span></header>

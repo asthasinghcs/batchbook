@@ -16,6 +16,11 @@ def item_quantities(item):
     return tuple(UNIT_MAP[item["unit"]]) + (("carton",) if item["unit"] == "packet" else ())
 
 
+def material_inputs(form, items, kind):
+    return {item["id"]: (form.get(f"used_{item['id']}"), form.get(f"waste_{item['id']}"),
+                         form.get(f"unit_{item['id']}")) for item in items if item["kind"] == kind}
+
+
 @bp.get("/stock")
 @access(*STOCK_ROLES)
 def stock():
@@ -29,6 +34,24 @@ def stock():
         items.append(dict(item, reserved=reservations, available=item["on_hand"] - reservations,
                           units=item_quantities(item)))
     return render_template("stock.html", items=items, admin=g.user["role"] == "admin")
+
+
+@bp.get("/stock/<int:item_id>")
+@access(*STOCK_ROLES)
+def item_ledger(item_id):
+    item = inventory.item_for(item_id)
+    moves = db().execute(
+        """SELECT m.*, SUM(m.quantity) OVER (ORDER BY m.id) AS running,
+                  u.display_name, p.reference, i.number, i.id AS invoice_id, a.reason
+           FROM stock_moves m JOIN users u ON u.id = m.actor_id
+           LEFT JOIN purchases p ON m.source = 'purchase' AND p.id = m.source_id
+           LEFT JOIN dispatches d ON m.source = 'dispatch' AND d.id = m.source_id
+           LEFT JOIN invoices i ON i.id = d.invoice_id
+           LEFT JOIN adjustments a ON m.source = 'adjustment' AND a.id = m.source_id
+           WHERE m.item_id = ? ORDER BY m.id DESC""",
+        (item_id,),
+    ).fetchall()
+    return render_template("item_ledger.html", item=item, moves=moves, closing=inventory.balance(item_id)[0])
 
 
 @bp.post("/stock/adjust")
@@ -64,6 +87,18 @@ def purchases():
     return render_template("purchases.html", receipts=receipts, items=items, suppliers=suppliers)
 
 
+@bp.get("/purchases/<int:receipt_id>")
+@access(*STOCK_ROLES)
+def receipt(receipt_id):
+    row = required(
+        """SELECT p.*, i.name AS item, i.unit, s.name AS supplier, u.display_name
+           FROM purchases p JOIN items i ON i.id = p.item_id JOIN suppliers s ON s.id = p.supplier_id
+           JOIN users u ON u.id = p.actor_id WHERE p.id = ?""",
+        (receipt_id,),
+    )
+    return render_template("receipt.html", receipt=row)
+
+
 @bp.get("/production")
 @access(*STOCK_ROLES)
 def runs():
@@ -73,7 +108,14 @@ def runs():
     ).fetchall()
     work = [dict(row, yield_variance=variance(row["actual_packets"], row["planned_packets"], row["tolerance_bp"]),
                  unit_cost=inventory.packet_cost(row)) for row in rows]
-    return render_template("runs.html", runs=work, operator=g.user["role"] in OPERATORS)
+    drafts = []
+    if g.user["role"] in OPERATORS:
+        drafts = db().execute(
+            """SELECT d.*, i.name AS product, u.display_name AS started_by FROM run_drafts d
+               JOIN items i ON i.id = d.product_id JOIN users u ON u.id = d.actor_id
+               WHERE d.run_id IS NULL ORDER BY d.id DESC"""
+        ).fetchall()
+    return render_template("runs.html", runs=work, drafts=drafts, operator=g.user["role"] in OPERATORS)
 
 
 @bp.route("/production/new", methods=["GET", "POST"])
@@ -92,17 +134,40 @@ def new_run():
         components = [dict(item, units=item_quantities(item), on_hand=inventory.balance(item["id"])[0])
                       for item in lines]
         if request.method == "POST":
-            amounts = {item["id"]: (form.get(f"used_{item['id']}"), form.get(f"waste_{item['id']}"),
-                                    form.get(f"unit_{item['id']}")) for item in components}
             try:
-                run_id = inventory.run(g.user["id"], product_id, form.get("batches"), form.get("good_packets"),
-                                       amounts, form.get("notes", ""), ref)
-                flash("Run posted. Material issues and finished output are in the stock ledger.", "success")
-                return redirect(url_for("factory.run", run_id=run_id), code=303)
+                draft_id = inventory.start_run(g.user["id"], product_id, form.get("batches"),
+                                               material_inputs(form, components, "raw"), ref)
+                return redirect(url_for("factory.draft", draft_id=draft_id), code=303)
             except BusinessError as error:
                 flash(str(error), "error")
     return render_template("new_run.html", products=products, recipe=recipe, product_id=product_id,
                            components=components, ref=ref)
+
+
+@bp.route("/production/drafts/<int:draft_id>", methods=["GET", "POST"])
+@access(*OPERATORS)
+def draft(draft_id):
+    header = inventory.draft_for(draft_id)
+    if header["run_id"]:
+        return redirect(url_for("factory.run", run_id=header["run_id"]), code=303)
+    lines = [dict(item, units=item_quantities(item), on_hand=inventory.balance(item["id"])[0])
+             for item in inventory.draft_lines(draft_id)]
+    form = request.form
+    if request.method == "POST":
+        try:
+            if form.get("action") == "revise":
+                inventory.revise_materials(g.user["id"], draft_id, material_inputs(form, lines, "raw"))
+                flash("Material quantities updated.", "success")
+                return redirect(url_for("factory.draft", draft_id=draft_id), code=303)
+            run_id = inventory.post_run(g.user["id"], draft_id, form.get("good_packets"),
+                                       material_inputs(form, lines, "packaging"), form.get("notes", ""))
+            flash("Batch posted. Material issues and good packets are in the stock ledger.", "success")
+            return redirect(url_for("factory.run", run_id=run_id), code=303)
+        except BusinessError as error:
+            flash(str(error), "error")
+    materials = [item for item in lines if item["kind"] == "raw"]
+    packaging = [item for item in lines if item["kind"] == "packaging"]
+    return render_template("draft.html", draft=header, materials=materials, packaging=packaging)
 
 
 @bp.get("/production/<int:run_id>")
@@ -122,12 +187,21 @@ def run(run_id):
              )]
     events = db().execute(
         """SELECT a.*, u.display_name FROM audit_events a JOIN users u ON u.id = a.actor_id
-           WHERE a.entity = 'run' AND a.entity_id = ? ORDER BY a.id DESC""",
+           WHERE (a.entity = 'run' AND a.entity_id = ?)
+              OR (a.entity = 'draft' AND a.entity_id IN (SELECT id FROM run_drafts WHERE run_id = ?))
+           ORDER BY a.id DESC""",
+        (run_id, run_id),
+    ).fetchall()
+    movements = db().execute(
+        """SELECT m.*, i.name, i.unit,
+                  (SELECT SUM(s.quantity) FROM stock_moves s WHERE s.item_id = m.item_id AND s.id <= m.id) AS after
+           FROM stock_moves m JOIN items i ON i.id = m.item_id
+           WHERE m.source = 'production' AND m.source_id = ? ORDER BY m.quantity > 0 DESC, m.id""",
         (run_id,),
     ).fetchall()
     return render_template("run.html", run=header, lines=lines, unit_cost=inventory.packet_cost(header),
                            yield_variance=variance(header["actual_packets"], header["planned_packets"], header["tolerance_bp"]),
-                           events=events, operator=g.user["role"] in OPERATORS)
+                           events=events, movements=movements, operator=g.user["role"] in OPERATORS)
 
 
 @bp.post("/production/<int:run_id>/cost")

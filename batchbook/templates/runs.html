@@ -2,10 +2,23 @@
 {% from 'ui.html' import heading, empty, check %}
 {% block title %}Production runs{% endblock %}
 {% block content %}
-{% call heading('Production runs', 'Post material issues and compare finished yield against the recipe.') %}
-  {% if operator %}<a class="button primary" href="{{ url_for('factory.new_run') }}">New production run</a>{% endif %}
+{% call heading('Production', 'Batch records, recipe variances and cost per packet.') %}
+  {% if operator %}<a class="button primary" href="{{ url_for('factory.new_run') }}">Start a batch</a>{% endif %}
 {% endcall %}
+{% if drafts %}
 <section class="panel">
+  <header class="panel-heading"><h2>Awaiting yield</h2><span class="status status-submitted">{{ drafts|length }} open</span></header>
+  <ul class="record-list">
+    {% for draft in drafts %}<li>
+      <div><strong>{{ draft.product }}</strong><small>{{ draft.started_by }} · {{ draft.started_on }}</small></div>
+      <div class="record-amount">{{ draft.planned_packets }} planned</div>
+      <a class="button button-small" href="{{ url_for('factory.draft', draft_id=draft.id) }}">Record yield</a>
+    </li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+<section class="panel">
+  <header class="panel-heading"><h2>Posted batches</h2></header>
   {% if runs %}
   <div class="table-wrap"><table><thead><tr><th>Run</th><th>Product</th><th class="number">Expected</th><th class="number">Good packets</th><th>Yield variance</th><th class="number">Cost / packet</th></tr></thead>
   <tbody>{% for run in runs %}<tr><td><a href="{{ url_for('factory.run', run_id=run.id) }}">RUN-{{ '%04d'|format(run.id) }}</a><small>{{ run.on_date }}</small></td>

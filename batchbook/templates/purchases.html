@@ -24,7 +24,7 @@
   <header class="panel-heading"><h2>Recent receipts</h2></header>
   {% if receipts %}
     <div class="table-wrap"><table><thead><tr><th>Reference</th><th>Supplier</th><th>Item</th><th class="number">Quantity</th><th class="number">Value</th></tr></thead>
-      <tbody>{% for row in receipts %}<tr><td>{{ row.reference }}<small>{{ row.on_date }}</small></td>
+      <tbody>{% for row in receipts %}<tr><td><a href="{{ url_for('factory.receipt', receipt_id=row.id) }}">{{ row.reference }}</a><small>{{ row.on_date }}</small></td>
         <td>{{ row.supplier }}</td><td>{{ row.item }}</td><td class="number">{{ row.quantity|qty(row.unit) }} {{ row.unit }}</td>
         <td class="number">₹{{ row.total_paise|money }}</td></tr>{% endfor %}</tbody></table></div>
   {% else %}{{ empty('No supplier receipts have been posted.') }}{% endif %}
