@@ -15,7 +15,7 @@ git clone https://github.com/asthasinghcs/batchbook.git
 cd batchbook
 ```
 
-Choose either Docker Compose or Python 3.12. When the app starts, open the local sign-in page and select **Factory Admin** under **Use a demo login**. [Open localhost:8000](http://localhost:8000)
+Choose either Docker Compose or Python 3.12. When the app starts, open the local sign-in page and select **Factory Admin** under **Use a demo login**. [Open 127.0.0.1:8000](http://127.0.0.1:8000)
 
 ### Docker Compose
 
