@@ -25,6 +25,7 @@
     <a class="button button-small" href="{{ url_for('factory.plan') }}">Plan replenishment</a>
   </aside>{% endif %}
 {% endif %}
+{% if review_error %}<p class="notice error" role="alert">{{ review_error }}</p>{% endif %}
 <section class="panel">
   <header class="panel-heading"><h2>Order lines</h2><span class="muted">{{ order.salesman }}</span></header>
   {% set editable = admin and order.status == 'submitted' %}
@@ -33,14 +34,14 @@
     <thead><tr><th>Product</th><th class="number">Packets</th><th class="number">Price / packet</th>{% if editable %}<th class="number">On hand</th><th class="number">Available</th>{% endif %}</tr></thead>
     <tbody>{% for line in lines %}<tr>
       <td>{{ line.name }}<small>{{ line.sku }}</small></td>
-      <td class="number">{% if editable %}<input class="inline-input" type="number" min="1" step="1" name="qty_{{ line.product_id }}" value="{{ line.packets }}" aria-label="{{ line.name }} packets" required>{% else %}{{ line.packets }}{% endif %}</td>
-      <td class="number">{% if editable %}<input class="inline-input" type="number" min="0.01" step="0.01" name="price_{{ line.product_id }}" value="{{ line.price_paise|money|replace(',', '') }}" aria-label="{{ line.name }} price per packet" required>{% else %}₹{{ line.price_paise|money }}{% endif %}</td>
+      <td class="number">{% if editable %}<input class="inline-input" type="number" min="1" step="1" name="qty_{{ line.product_id }}" value="{{ review_values.get('qty_' ~ line.product_id, line.packets) }}" aria-label="{{ line.name }} packets" required>{% else %}{{ line.packets }}{% endif %}</td>
+      <td class="number">{% if editable %}<input class="inline-input" type="number" min="0.01" step="0.01" name="price_{{ line.product_id }}" value="{{ review_values.get('price_' ~ line.product_id, line.price_paise|money|replace(',', '')) }}" aria-label="{{ line.name }} price per packet" required>{% else %}₹{{ line.price_paise|money }}{% endif %}</td>
       {% if editable %}<td class="number">{{ line.on_hand }}</td><td class="number {{ 'flagged' if line.short }}">{{ line.available }}</td>{% endif %}
     </tr>{% endfor %}</tbody>
   </table></div>
   {% if editable %}
     <div class="padded form-stack">
-      <label>Review note<textarea name="note" maxlength="400" rows="2" placeholder="Required when rejecting"></textarea></label>
+      <label>Review note<textarea name="note" maxlength="400" rows="2" placeholder="Required when rejecting">{{ review_values.get('note', '') }}</textarea></label>
       <div class="actions"><button class="button primary" name="decision" value="approve">Approve and reserve</button>
         <button class="button button-danger" name="decision" value="reject" formnovalidate>Reject order</button></div>
     </div>

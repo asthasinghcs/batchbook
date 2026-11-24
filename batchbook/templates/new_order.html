@@ -33,7 +33,9 @@
     <template data-line-template>{{ line('', '', 'packet') }}</template>
     <button type="button" class="button button-small" data-add-line hidden>Add product</button>
   </div>
-  <div class="order-total"><span>Estimated subtotal before GST</span><strong id="order-estimate" aria-live="polite">—</strong></div>
-  <div class="actions"><button class="button primary" data-order-submit type="submit">Send order</button><a class="button button-quiet" href="{{ url_for('sales.orders') }}">Cancel</a></div>
+  <footer class="order-checkout">
+    <div class="order-total"><span>Estimated subtotal before GST</span><strong id="order-estimate" aria-live="polite">—</strong></div>
+    <div class="actions"><button class="button primary" data-order-submit type="submit">Send order</button><a class="button button-quiet" href="{{ url_for('sales.orders') }}">Cancel</a></div>
+  </footer>
 </form>
 {% endblock %}

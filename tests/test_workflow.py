@@ -74,6 +74,14 @@ class BusinessWorkflow(unittest.TestCase):
         self.assertEqual(inventory.packet_cost(row), 3114)
         self.assertFalse(seed_demo())
 
+    def test_production_cannot_create_stock_without_material(self):
+        empty_issues = {item: ("0", "0", unit) for item, (_, _, unit) in ISSUES.items()}
+        draft = inventory.start_run(4, 6, "1", empty_issues, str(uuid4()))
+        with self.assertRaisesRegex(BusinessError, "Record material used"):
+            inventory.post_run(4, draft, "188", empty_issues, "")
+        self.assertEqual(inventory.balance(6)[0], 50)
+        self.assertIsNone(inventory.draft_for(draft)["run_id"])
+
     def test_competing_approvals_keep_one_reservation(self):
         first = sales.submit(1, 1, [(6, "40", "packet")], uuid4())
         second = sales.submit(2, 2, [(6, "40", "packet")], uuid4())

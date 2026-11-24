@@ -106,6 +106,10 @@ def sync():
 @bp.get("/orders/<int:order_id>")
 @access("admin", "sales")
 def order(order_id):
+    return render_order(order_id)
+
+
+def render_order(order_id, review_error=None, review_values=None):
     header = sales.order_for(order_id)
     if g.user["role"] == "sales" and g.user["id"] != header["salesman_id"]:
         abort(404)
@@ -115,7 +119,10 @@ def order(order_id):
         on_hand, available = sales.availability(row["product_id"], order_id) if admin else (0, 0)
         lines.append(dict(row, on_hand=on_hand, available=available, short=max(0, row["packets"] - available)))
     invoice = db().execute("SELECT id, number FROM invoices WHERE order_id = ?", (order_id,)).fetchone()
-    return render_template("order.html", order=header, lines=lines, invoice=invoice, admin=admin)
+    return render_template(
+        "order.html", order=header, lines=lines, invoice=invoice, admin=admin,
+        review_error=review_error, review_values=review_values or {},
+    )
 
 
 @bp.post("/orders/<int:order_id>/review")
@@ -127,9 +134,12 @@ def review(order_id):
     edits = {row["product_id"]: (request.form.get(f"qty_{row['product_id']}"),
                                  request.form.get(f"price_{row['product_id']}"))
              for row in sales.order_lines(order_id)}
-    return action(url_for("sales.order", order_id=order_id),
-                  "Order approved and stock reserved." if decision == "approve" else "Order rejected.",
-                  sales.review, g.user["id"], order_id, decision, edits, request.form.get("note", ""))
+    try:
+        sales.review(g.user["id"], order_id, decision, edits, request.form.get("note", ""))
+    except BusinessError as error:
+        return render_order(order_id, review_error=str(error), review_values=request.form), 422
+    flash("Order approved and stock reserved." if decision == "approve" else "Order rejected.", "success")
+    return redirect(url_for("sales.order", order_id=order_id), code=303)
 
 
 @bp.post("/orders/<int:order_id>/invoice")

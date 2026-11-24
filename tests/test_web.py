@@ -92,6 +92,15 @@ class WebWorkflow(unittest.TestCase):
             self.assertEqual(accepted.json["order"], 2)
         self.assertIn(b"32-packet shortage", admin.get("/orders/2").data)
         self.assertIn(b"IGST if invoiced", admin.get("/orders/2").data)
+        blocked = self.post(admin, "/orders/2/review", {
+            "decision": "approve", "qty_6": 121, "price_6": "49.50", "note": "Check tomorrow's stock.",
+        })
+        self.assertEqual(blocked.status_code, 422)
+        self.assertIn(b"short by 33 packets", blocked.data)
+        self.assertIn(b'name="qty_6" value="121"', blocked.data)
+        self.assertIn(b'name="price_6" value="49.50"', blocked.data)
+        self.assertIn(b"Check tomorrow&#39;s stock.", blocked.data)
+        self.assertIn(b"32-packet shortage", admin.get("/orders/2").data)
         plan = production.get("/production/plan")
         self.assertEqual(plan.status_code, 200)
         self.assertIn(b"1 batch to make", plan.data)

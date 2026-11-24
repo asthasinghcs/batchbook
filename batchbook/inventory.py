@@ -205,6 +205,8 @@ def post_run(actor, draft_id, good_packets, amounts, notes):
             used, wasted = (item["used"], item["wasted"]) if item["kind"] == "raw" else recorded_amounts(item, amounts)
             cost = issue_cost(item, used + wasted)
             consumption.append((item["id"], item["planned"], used, wasted, cost))
+        if actual and not any(used for _, _, used, _, _ in consumption):
+            raise BusinessError("Record material used before posting good packets.")
         material_cost = sum(line[4] for line in consumption)
         run_id = connection.execute(
             """INSERT INTO runs
