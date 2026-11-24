@@ -16,6 +16,7 @@ class Report:
     title: str
     headers: tuple
     rows: list
+    as_of: str | None = None
 
 
 def rupees(paise):
@@ -221,7 +222,7 @@ def outstanding(_start, end, _item):
         customer[5] += remaining
     return Report("Outstanding and ageing", ("Customer", "Current", "1–30 days late", "31–60 days late",
                                              "61–90 days late", "90+ days late", "Total (INR)"),
-                  [(name, *(rupees(value) for value in buckets)) for (_, name), buckets in totals.items()])
+                  [(name, *(rupees(value) for value in buckets)) for (_, name), buckets in totals.items()], as_of=end)
 
 
 REPORTS = {

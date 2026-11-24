@@ -7,7 +7,7 @@ Start with a fresh database. Use one browser profile per role, or sign out betwe
 3. Enter 188 good packets, 188 used and 6 wasted pouches, and 9 used cartons. Post the batch. Show the −6% yield and +5% oil flags. In **Stock after this batch**, show 120 kg flour, 19.5 L oil, 306 pouches and 238 finished packets. Open the flour ledger to show both the receipt and the batch issue.
 4. At phone width as **Salesman A**, open **New order**. Select Retailer A and order 150 Murukku packets.
 5. As **Factory Admin**, review the order, approve and reserve it, and raise the invoice. Show the ₹7,875 PDF total with CGST and SGST of ₹187.50 each. Record dispatch. Show 88 finished packets in **Stock**.
-6. At phone width as **Salesman B**, submit 120 packets for Distributor B. As admin, open the order and show the 32-packet shortage and the IGST indicator. The order stays submitted and can be revisited after replenishment.
+6. At phone width as **Salesman B**, submit 120 packets for Distributor B. As admin, open the order and show the 32-packet shortage and the IGST indicator. Open **Plan replenishment** to show one suggested batch and its required materials. Leave the order and inventory unchanged so the benchmark can continue with the original stock.
 7. On Retailer A’s invoice, record ₹4,000 paid by UPI with reference `RETAIL-A-01`. Show ₹3,875 outstanding.
 8. In the production run, save ₹1,200 labour and ₹600 gas and power. Show the ₹5,855 total, ₹31.14 cost per good packet and ₹18.86 margin.
 9. As **External Auditor**, open **Reports**. Use the current month and show the sales register, GST, purchases, stock and ledger, production variance, collections and ageing. Open the ten-sheet Excel export and show the outstanding balance.
@@ -18,6 +18,7 @@ Start with a fresh database. Use one browser profile per role, or sign out betwe
 - Trace a purchase into `stock_moves`, then the flour issue into `run_lines`. Show how the posting function commits the rows together.
 - Work the flour valuation on paper. `(100 × 42 + 60 × 45) ÷ 160 = ₹43.125/kg`. That rate times 40 kg is ₹1,725.
 - Trace the Karnataka order. It stays submitted with 88 available, so an IGST invoice is never posted in the benchmark.
+- Explain why the planner recommends one batch for a 32-packet gap. The current recipe expects 200 packets per batch, and the plan rounds up to whole batches before checking combined material needs.
 - Rehearse adding a 500 g pack. Create a finished item and configure its yield and ingredient quantities under **Master data → Recipes (BOM)**. The original pack remains a separate stock item. Discuss how you would share a formula across pack sizes if asked to extend the schema.
 
 The problem statement permits AI coding assistants. Be ready to explain the behavior, run the benchmark independently and make a small change live.

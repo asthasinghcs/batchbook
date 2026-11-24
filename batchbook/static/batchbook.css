@@ -152,6 +152,17 @@ td a { font-weight: 650; white-space: nowrap; }
 .notice.warning { background: var(--warn-bg); border-color: #e2ce9b; border-left-color: var(--warn); color: var(--warn); }
 .notice.error { background: var(--error-bg); border-color: #e5c7bc; border-left-color: var(--error); color: var(--error); }
 .notice .button { margin: .22rem; }
+.shortage-notice, .plan-action { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .45rem 1rem; }
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 1rem; }
+.plan-numbers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border-bottom: 1px solid var(--line); }
+.plan-numbers div { padding: .65rem 1.1rem; }
+.plan-numbers div + div { border-left: 1px solid var(--line); }
+.plan-numbers dt { font-size: .84rem; }
+.plan-numbers dd { margin: .1rem 0 0; font: 1.65rem/1.2 var(--serif); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.plan-coverage > div { display: flex; justify-content: space-between; gap: .5rem; color: var(--quiet); font-size: .82rem; }
+.plan-coverage meter { display: block; width: 100%; height: .8rem; margin-top: .32rem; accent-color: var(--accent); }
+.plan-action { background: var(--soft); }
+.plan-action small { display: block; color: var(--quiet); }
 .empty { padding: 1.45rem 1.1rem; color: var(--quiet); }
 label { display: grid; align-content: start; gap: .28rem; color: #3c4035; font-size: .9rem; font-weight: 650; }
 label small { font-weight: normal; }

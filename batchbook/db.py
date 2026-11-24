@@ -44,9 +44,9 @@ def initialize():
 
 
 @contextmanager
-def atomic():
+def atomic(*, write=True):
     connection = db()
-    connection.execute("BEGIN IMMEDIATE")
+    connection.execute("BEGIN IMMEDIATE" if write else "BEGIN")
     try:
         yield connection
         connection.commit()

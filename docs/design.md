@@ -32,6 +32,8 @@ SQLite acquires the write lock before the availability check so two approvals ca
 
 A recipe defines material and packaging per batch, expected packets and tolerance. Starting a batch saves a copy of that plan and the raw quantities entered. Posting adds the packaging and yield. Variance compares the total used plus waste with the saved plan. For 10 L planned and 10.5 L used the variance is +5%. For 200 expected and 188 good packets it is −6%. A flag requires a variance strictly outside the tolerance. Storage units are whole pieces, grams or millilitres. A carton converts to its product’s configured packet count.
 
+Production planning reads submitted packets and available stock from one database snapshot. Suggested batches equal the shortage divided by expected yield, rounded up. The material check adds the BOM requirement for each suggested batch across all products.
+
 ### Valuation and accounts
 
 Each stock movement carries a value in integer paise. A receipt adds quantity and purchase value. For an issue, the current ledger value divided by quantity gives a moving weighted average. The issue value rounds once to the nearest paise. This uses blended costs without tracking purchase lots. The production run transfers material cost into finished stock, then adds labour and energy directly to that run for the cost-per-good-packet comparison. Units and stock value use consistent integer arithmetic.

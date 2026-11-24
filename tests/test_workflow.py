@@ -1,10 +1,12 @@
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Barrier
 from uuid import uuid4
 
-from batchbook import create_app, inventory, sales
+from batchbook import create_app, inventory, masters, sales
 from batchbook.db import BusinessError, db
 from batchbook.numbers import quantity, variance
 from batchbook.seed import seed_demo
@@ -22,8 +24,8 @@ class BusinessWorkflow(unittest.TestCase):
     def setUp(self):
         temp = TemporaryDirectory()
         self.addCleanup(temp.cleanup)
-        app = create_app({"DATABASE": Path(temp.name) / "test.sqlite3", "BUSINESS_DATE": date(2026, 11, 23)})
-        context = app.app_context()
+        self.app = create_app({"DATABASE": Path(temp.name) / "test.sqlite3", "BUSINESS_DATE": date(2026, 11, 23)})
+        context = self.app.app_context()
         context.push()
         self.addCleanup(context.pop)
         seed_demo()
@@ -71,6 +73,42 @@ class BusinessWorkflow(unittest.TestCase):
         self.assertEqual(row["material_paise"], 405_500)
         self.assertEqual(inventory.packet_cost(row), 3114)
         self.assertFalse(seed_demo())
+
+    def test_competing_approvals_keep_one_reservation(self):
+        first = sales.submit(1, 1, [(6, "40", "packet")], uuid4())
+        second = sales.submit(2, 2, [(6, "40", "packet")], uuid4())
+        ready = Barrier(2)
+
+        def approve(order_id):
+            with self.app.app_context():
+                ready.wait(timeout=5)
+                try:
+                    sales.review(3, order_id, "approve", {6: ("40", "50")}, "")
+                except BusinessError as error:
+                    return str(error)
+                return "approved"
+
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(approve, (first, second)))
+        self.assertCountEqual(results, ["approved", "Murukku 200 g is short by 30 packets."])
+        self.assertEqual(sales.availability(6), (50, 10))
+        self.assertCountEqual([sales.order_for(order)["status"] for order in (first, second)], ["approved", "submitted"])
+
+    def test_production_plan_combines_shared_materials_and_excludes_reservations(self):
+        first = sales.submit(1, 1, [(6, "40", "packet")], uuid4())
+        sales.review(3, first, "approve", {6: ("40", "50")}, "")
+        second_product = masters.add_item(3, {"sku": "M500", "name": "Murukku 500 g", "kind": "finished",
+                                              "unit": "packet", "price": "100", "gst": "5", "hsn": "210690", "pack": "10"})
+        masters.save_recipe(3, second_product, "20", "3", {"item_1": "80"})
+        sales.submit(2, 2, [(6, "120", "packet"), (second_product, "20", "packet")], uuid4())
+
+        products, materials = inventory.production_plan()
+
+        self.assertEqual([(row["requested"], row["available"], row["short"], row["batches"]) for row in products],
+                         [(120, 10, 110, 1), (20, 0, 20, 1)])
+        flour = next(row for row in materials if row["id"] == 1)
+        self.assertEqual((flour["needed"], flour["on_hand"], flour["short"]), (120_000, 100_000, 20_000))
+        self.assertEqual(sales.availability(6), (50, 10))
 
     def test_run_failure_keeps_all_balances_and_records_unchanged(self):
         draft = inventory.start_run(4, 6, "1", ISSUES, str(uuid4()))

@@ -85,6 +85,35 @@ def recipe_for(product_id):
     return recipe, lines
 
 
+def production_plan():
+    """Cover submitted orders with unreserved stock, then quote whole BOM batches."""
+    products, materials = [], {}
+    with atomic(write=False) as connection:
+        demand = connection.execute(
+            """SELECT i.id, i.name, i.sku, r.expected_packets, SUM(l.packets) AS requested
+               FROM order_lines l JOIN sales_orders o ON o.id = l.order_id
+               JOIN items i ON i.id = l.product_id LEFT JOIN recipes r ON r.product_id = i.id
+               WHERE o.status = 'submitted' GROUP BY i.id ORDER BY i.name, i.id"""
+        ).fetchall()
+        for product in demand:
+            product_id = product["id"]
+            held = reserved(product_id)
+            available = max(0, balance(product_id)[0] - held)
+            short = max(0, product["requested"] - available)
+            per_batch = product["expected_packets"]
+            batches = (short + per_batch - 1) // per_batch if short and per_batch else 0
+            products.append(dict(product, available=available, held=held, short=short, batches=batches))
+            if batches:
+                _, recipe_lines = recipe_for(product_id)
+                for item in recipe_lines:
+                    material = materials.setdefault(item["id"], dict(item, needed=0))
+                    material["needed"] += item["per_batch"] * batches
+        for material in materials.values():
+            material["on_hand"] = balance(material["id"])[0]
+            material["short"] = max(0, material["needed"] - material["on_hand"])
+    return products, sorted(materials.values(), key=lambda row: (row["kind"] != "raw", row["name"]))
+
+
 def start_run(actor, product_id, batches, amounts, client_ref):
     try:
         client_ref = str(UUID(client_ref))

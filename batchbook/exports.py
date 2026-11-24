@@ -49,7 +49,7 @@ def workbook_response(reports, name, period):
     for report in reports:
         sheet = book.create_sheet(report.title[:31])
         sheet.append([report.title])
-        sheet.append([period])
+        sheet.append([f"As of {report.as_of}" if report.as_of else period])
         sheet.append(report.headers)
         for row in report.rows:
             sheet.append(row)

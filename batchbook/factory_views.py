@@ -125,6 +125,9 @@ def new_run():
         """SELECT i.id, i.name FROM items i JOIN recipes r ON r.product_id = i.id ORDER BY i.name"""
     ).fetchall()
     form = request.form
+    suggested_batches = request.args.get("batches", default=1, type=int)
+    if not 1 <= suggested_batches <= 100:
+        suggested_batches = 1
     product_id = form.get("product_id", type=int) if request.method == "POST" else request.args.get("product", type=int)
     recipe, components = None, []
     ref = form.get("client_ref") or str(uuid4())
@@ -141,7 +144,15 @@ def new_run():
             except BusinessError as error:
                 flash(str(error), "error")
     return render_template("new_run.html", products=products, recipe=recipe, product_id=product_id,
-                           components=components, ref=ref)
+                           components=components, ref=ref, suggested_batches=suggested_batches)
+
+
+@bp.get("/production/plan")
+@access("admin", "production", "owner")
+def plan():
+    products, materials = inventory.production_plan()
+    return render_template("production_plan.html", products=products, materials=materials,
+                           operator=g.user["role"] in OPERATORS)
 
 
 @bp.route("/production/drafts/<int:draft_id>", methods=["GET", "POST"])

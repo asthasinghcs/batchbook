@@ -2,6 +2,8 @@
 
 Batchbook is the order-to-audit desk for Kaveri Snack Works, a fictional snack factory in Tamil Nadu. A supervisor records ingredients against a recipe, counts good packets and posts the batch. The same stock ledger backs order approval, dispatch and the month-end reports.
 
+[Run locally](#run-the-demo) · [Replay the benchmark](docs/benchmark.md) · [Design note](docs/design.md) · [Test and Compose checks](https://github.com/asthasinghcs/batchbook/actions)
+
 ## Run the demo
 
 From the repository root, run `docker compose up --build` and open [localhost:8000](http://localhost:8000). Docker stores the demo data in a named volume so a restart keeps your work.
@@ -53,7 +55,7 @@ Materials cost ₹4,055. That includes ₹1,725 flour at a moving weighted-avera
 | --- | --- |
 | Must have | Server-checked roles, product/customer/material/BOM masters, mobile orders, admin approval and stock reservation, GST invoices as PDFs, saved batch preparation and atomic stock posting, yield and material variances, traceable stock ledger, and sales/stock exports |
 | Should have | Suppliers and material purchases, payment and customer ageing, run cost and margin, outward GST reporting, variance alerts, owner overview |
-| Stretch | Offline queue and retry from an already-open sales form, item-level stock adjustments, full monthly Excel workbook |
+| Stretch | Production planning from pending orders, offline queue and retry from an already-open sales form, item-level stock adjustments, full monthly Excel workbook |
 
 Reports cover sales register, sales by customer and product, outward GST, purchases, stock summary and ledger, production and waste, collections, and outstanding balances. Each report has CSV, Excel and PDF output. Sales by customer inside the salesperson workspace counts that salesperson’s dispatched, pre-tax sales. Auditor sales figures use the invoice and credit-note dates.
 
@@ -62,6 +64,7 @@ Reports cover sales register, sales by customer and product, outward GST, purcha
 - Flask with server-rendered Jinja keeps a user action traceable from the form to one Python function. SQLite makes a single-factory demo easy to run and provides transactions for multi-step writes. Openpyxl and ReportLab produce portable, readable exports.
 - Posting dates use IST. Seed opening quantities are dated the first day of that month. The problem supplies no value for opening finished stock, so the seed assumes ₹30 per packet for stock valuation. Production transfers material cost into finished stock. The run absorbs labour and energy for management costing.
 - The material sheet can stay open across a shift. It saves the quantities and the recipe plan as a draft. Posting the finished count commits material issues, packaging waste and finished stock together. The stock check runs again at posting because other batches can consume the same supplies.
+- The production plan compares submitted demand with unreserved finished stock. It rounds shortages up to whole batches at the recipe’s expected yield and sums shared material needs across products. Open drafts do not increase available stock.
 - The benchmark uses the supplied 5% GST rate and a sample HSN, with the customer’s state as place of supply. The PDF uses the fields in Rule 46 as a reference. These are demo documents with illustrative GSTINs and addresses. The GST report is a reconciliation aid for GSTR-1 and GSTR-3B, with no government upload or e-invoicing integration. [CBIC Rule 46](https://taxinformation.cbic.gov.in/content-page/explore-rules/1000136/1000001)
 - This prototype handles full dispatches. An unpaid and undispatched invoice can be cancelled through a full credit note. Returns, partial fulfilment, work in progress, batch expiry and Tally integration are outside this release.
 - An open mobile order form can capture and retry through a connection drop. The queue stays in that browser and is synced under the original account. Fresh login or reopening the form requires a connection. Email sharing opens a draft, with the downloaded PDF attached by the sender.
@@ -72,7 +75,7 @@ Reports cover sales register, sales by customer and product, outward GST, purcha
 python -m unittest discover -s tests -v
 ```
 
-The tests run the benchmark through the business functions and HTTP routes. They check that drafts leave stock alone, recipe edits leave an open batch’s plan intact, a failed posting leaves balances unchanged, and ledger entries link to their source records. They also cover unit conversions, tax, credit notes, order retry, roles and file exports.
+The tests run the benchmark through the business functions and HTTP routes. They also cover two approvals competing for the same stock, shared material shortages across products, failed batch posting, tax, credits, permissions and file exports. GitHub Actions starts the app with Docker Compose and checks that the login page responds.
 
 ## Photograph
 

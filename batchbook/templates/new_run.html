@@ -14,7 +14,7 @@
       <label>Product<select name="product" form="choose-product" data-batch-product>
         {% for product in products %}<option value="{{ product.id }}" {{ 'selected' if product.id == product_id }}>{{ product.name }}</option>{% endfor %}
       </select></label>
-      <label>Batches<input type="number" name="batches" min="0.001" max="100" step="0.001" value="{{ request.form.get('batches', '1') }}" required></label>
+      <label>Batches<input type="number" name="batches" min="0.001" max="100" step="0.001" value="{{ request.form.get('batches', suggested_batches) }}" required></label>
     </div>
     {{ materials_table(components|selectattr('kind', 'equalto', 'raw'), 'per_batch') }}
     <div class="panel-footer actions"><button class="button primary">Save materials and continue</button>

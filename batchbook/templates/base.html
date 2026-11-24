@@ -41,7 +41,7 @@
           <div class="nav-section">
             <span class="nav-caption">Operations</span>
             {% if role == 'admin' %}{{ nav_item('Orders', 'sales.orders', endpoint in ['sales.orders', 'sales.order']) }}{% endif %}
-            {{ nav_item('Production', 'factory.runs', endpoint in ['factory.runs', 'factory.run', 'factory.new_run', 'factory.draft']) }}
+            {{ nav_item('Production', 'factory.runs', endpoint in ['factory.runs', 'factory.run', 'factory.new_run', 'factory.draft', 'factory.plan']) }}
             {% if role in ['admin', 'production'] %}{{ nav_item('Purchases', 'factory.purchases', endpoint in ['factory.purchases', 'factory.receipt']) }}{% endif %}
             {{ nav_item('Stock', 'factory.stock', endpoint in ['factory.stock', 'factory.item_ledger']) }}
           </div>

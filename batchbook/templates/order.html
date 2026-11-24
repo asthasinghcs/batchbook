@@ -19,7 +19,11 @@
   </ol>
 {% endif %}
 {% if admin and order.status == 'submitted' %}
-  {% for line in lines if line.short %}<div class="notice warning"><strong>{{ line.short }}-packet shortage</strong> for {{ line.name }}. There are {{ line.available }} packets available against {{ line.packets }} requested. Reduce the quantity with the customer’s agreement or wait for stock.</div>{% endfor %}
+  {% set shortages = lines|selectattr('short')|list %}
+  {% if shortages %}<aside class="notice warning shortage-notice" aria-label="Stock shortages">
+    <div>{% for line in shortages %}<p><strong>{{ line.short }}-packet shortage</strong> for {{ line.name }}. {{ line.available }} available against {{ line.packets }} requested.</p>{% endfor %}</div>
+    <a class="button button-small" href="{{ url_for('factory.plan') }}">Plan replenishment</a>
+  </aside>{% endif %}
 {% endif %}
 <section class="panel">
   <header class="panel-heading"><h2>Order lines</h2><span class="muted">{{ order.salesman }}</span></header>

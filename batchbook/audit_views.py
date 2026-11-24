@@ -1,6 +1,6 @@
 from flask import Blueprint, abort, g, render_template, request
 
-from .db import db, today
+from .db import atomic, db, today
 from .reports import REPORTS, between
 from .web import AUDIT_ROLES, STOCK_ROLES, access
 
@@ -18,19 +18,20 @@ def reports():
     key = request.args.get("report", next(iter(choices)))
     output = request.args.get("format")
     item_id = request.args.get("item_id", type=int) if key in {"stock", "ledger"} else None
-    period = f"As of {end}" if key == "outstanding" else f"{start} to {end}"
+    period = f"{start} to {end}"
     if key == "all":
         if role not in AUDIT_ROLES or output != "xlsx":
             abort(403)
         from .exports import workbook_response
 
-        return workbook_response(
-            [build(start, end, None) for _, build in choices.values()],
-            f"batchbook-monthly-{start}_{end}", period,
-        )
+        with atomic(write=False):
+            sheets = [build(start, end, None) for _, build in choices.values()]
+        return workbook_response(sheets, f"batchbook-monthly-{start}_{end}", period)
     if key not in choices:
         abort(403)
     report = choices[key][1](start, end, item_id)
+    if report.as_of:
+        period = f"As of {report.as_of}"
     if output:
         from .exports import csv_response, pdf_response, report_pdf, workbook_response
 

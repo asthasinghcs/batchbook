@@ -3,6 +3,7 @@
 {% block title %}Production runs{% endblock %}
 {% block content %}
 {% call heading('Production', 'Batch records, recipe variances and cost per packet.') %}
+  {% if operator or g.user.role == 'owner' %}<a class="button" href="{{ url_for('factory.plan') }}">Production plan</a>{% endif %}
   {% if operator %}<a class="button primary" href="{{ url_for('factory.new_run') }}">Start a batch</a>{% endif %}
 {% endcall %}
 {% if drafts %}

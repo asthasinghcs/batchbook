@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% from 'ui.html' import heading, empty %}
+{% block title %}Production plan{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('factory.runs') }}">Production</a>
+{{ heading('Production plan', 'Use unreserved stock first. Make whole batches to cover the remaining demand.') }}
+
+{% if products %}
+<div class="plan-grid">
+  {% for product in products %}
+  <section class="panel plan-product">
+    <header class="panel-heading"><h2>{{ product.name }}</h2><small class="muted">{{ product.sku }}</small></header>
+    <dl class="plan-numbers">
+      <div><dt>Requested</dt><dd>{{ product.requested }}</dd></div>
+      <div><dt>Available</dt><dd>{{ product.available }}</dd></div>
+      <div{% if product.short %} class="flagged"{% endif %}><dt>Short</dt><dd>{{ product.short }}</dd></div>
+    </dl>
+    <div class="padded plan-coverage">
+      <div><label for="coverage-{{ product.id }}">Order coverage</label><span>{{ product.held }} already reserved</span></div>
+      <meter id="coverage-{{ product.id }}" min="0" max="{{ product.requested }}" value="{{ [product.available, product.requested]|min }}"></meter>
+    </div>
+    <footer class="panel-footer plan-action">
+      <div>
+        {% if product.batches %}
+          <strong>{{ product.batches }} {{ 'batch' if product.batches == 1 else 'batches' }} to make</strong>
+          <small>{{ product.batches * product.expected_packets }} expected good packets</small>
+        {% elif product.short %}
+          <strong>Recipe needed</strong><small>Add a BOM to calculate a batch count.</small>
+        {% else %}
+          <strong>Covered by stock</strong><small>Ready for order review.</small>
+        {% endif %}
+      </div>
+      {% if operator and product.batches %}
+        <a class="button button-small" href="{{ url_for('factory.new_run', product=product.id, batches=product.batches if product.batches <= 100 else none) }}">Start a batch</a>
+      {% elif g.user.role == 'admin' and product.short %}
+        <a class="button button-small" href="{{ url_for('factory.master', section='recipes', product_id=product.id) }}">Open recipes</a>
+      {% endif %}
+    </footer>
+  </section>
+  {% endfor %}
+</div>
+{% else %}
+<section class="panel">{{ empty('No submitted orders need review.') }}</section>
+{% endif %}
+
+{% if materials %}
+<section class="panel">
+  <header class="panel-heading"><h2>Materials for the plan</h2>
+    {% if operator and materials|selectattr('short')|list %}<a href="{{ url_for('factory.purchases') }}">Record a purchase</a>{% endif %}
+  </header>
+  <div class="table-wrap"><table>
+    <thead><tr><th scope="col">Material</th><th class="number" scope="col">Required</th><th class="number" scope="col">On hand</th><th class="number" scope="col">Short</th></tr></thead>
+    <tbody>{% for item in materials %}<tr>
+      <td><a href="{{ url_for('factory.item_ledger', item_id=item.id) }}">{{ item.name }}</a><small>{{ 'Raw material' if item.kind == 'raw' else 'Packaging' }}</small></td>
+      <td class="number">{{ item.needed|qty(item.unit) }} {{ item.unit }}</td>
+      <td class="number">{{ item.on_hand|qty(item.unit) }} {{ item.unit }}</td>
+      <td class="number{% if item.short %} flagged{% endif %}">{{ item.short|qty(item.unit) }} {{ item.unit }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <footer class="panel-footer muted">Material needs are combined across all suggested batches. Draft batches enter stock only when posted.</footer>
+</section>
+{% endif %}
+{% endblock %}
