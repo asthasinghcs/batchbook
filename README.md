@@ -2,7 +2,9 @@
 
 Batchbook is the order-to-audit desk for Kaveri Snack Works, a fictional snack factory in Tamil Nadu. A supervisor records ingredients against a recipe, counts good packets and posts the batch. The same stock ledger backs order approval, dispatch and the month-end reports.
 
-[Run locally](#run-the-demo) · [Replay the benchmark](docs/benchmark.md) · [Design note](docs/design.md) · [Test and Compose checks](https://github.com/asthasinghcs/batchbook/actions)
+[Download the demo video (MP4)](https://github.com/asthasinghcs/batchbook/releases/download/v1.0.0/Batchbook-Demo.mp4) · [Run locally](#run-the-demo) · [Replay the benchmark](docs/benchmark.md) · [Design note](docs/design.md) · [Checks](https://github.com/asthasinghcs/batchbook/actions)
+
+[![Batchbook factory dashboard and mobile sales form](docs/demo-preview.webp)](https://github.com/asthasinghcs/batchbook/releases/download/v1.0.0/Batchbook-Demo.mp4)
 
 ## Run the demo
 
@@ -77,6 +79,8 @@ python -m unittest discover -s tests -v
 
 The tests run the benchmark through the business functions and HTTP routes. They also cover two approvals competing for the same stock, shared material shortages across products, failed batch posting, tax, credits, permissions and file exports. GitHub Actions starts the app with Docker Compose and checks that the login page responds.
 
-## Photograph
+## Media credits
 
 The sign-in photo is Keerthiga’s *Murukku or Chakli*, converted to WebP from the Wikimedia preview and displayed cropped. [Source photograph](https://commons.wikimedia.org/wiki/File:Murukku_or_Chakli.jpg) · [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+
+The demo uses an excerpt of *Lobby Time* by Kevin MacLeod, with fades. [Source track](https://aux.incompetech.com/music/royalty-free/index.html?Search=Search&isrc=USUAN1600054) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
