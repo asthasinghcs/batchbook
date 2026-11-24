@@ -2,22 +2,47 @@
 
 Batchbook is the order-to-audit desk for Kaveri Snack Works, a fictional snack factory in Tamil Nadu. A supervisor records ingredients against a recipe, counts good packets and posts the batch. The same stock ledger backs order approval, dispatch and the month-end reports.
 
-[Download the demo video (MP4)](https://github.com/asthasinghcs/batchbook/releases/download/v1.0.0/Batchbook-Demo.mp4) · [Run locally](#run-the-demo) · [Replay the benchmark](docs/benchmark.md) · [Design note](docs/design.md) · [Checks](https://github.com/asthasinghcs/batchbook/actions)
+[Watch the demo on YouTube](https://youtu.be/yhLunMqufhk) · [Download the MP4](https://github.com/asthasinghcs/batchbook/releases/download/v1.0.0/Batchbook-Demo.mp4) · [Run locally](#run-the-demo) · [Replay the benchmark](docs/benchmark.md) · [Design note](docs/design.md) · [Checks](https://github.com/asthasinghcs/batchbook/actions)
 
-[![Batchbook factory dashboard and mobile sales form](docs/demo-preview.webp)](https://github.com/asthasinghcs/batchbook/releases/download/v1.0.0/Batchbook-Demo.mp4)
+[![Watch the Batchbook demo showing the factory dashboard and mobile sales form](docs/demo-preview.webp)](https://youtu.be/yhLunMqufhk)
 
 ## Run the demo
 
-From the repository root, run `docker compose up --build` and open [localhost:8000](http://localhost:8000). Docker stores the demo data in a named volume so a restart keeps your work.
+Clone the repository and open its folder. You can also download the source ZIP from GitHub and open the extracted folder.
 
-For a local Python 3.12 setup, run these commands.
+```sh
+git clone https://github.com/asthasinghcs/batchbook.git
+cd batchbook
+```
 
-```text
+Choose either Docker Compose or Python 3.12. When the app starts, open the local sign-in page and select **Factory Admin** under **Use a demo login**. [Open localhost:8000](http://localhost:8000)
+
+### Docker Compose
+
+Start Docker, then run this from the repository root.
+
+```sh
+docker compose up --build
+```
+
+Compose saves the SQLite database in a named volume so a restart keeps your work.
+
+### Python 3.12
+
+On Windows PowerShell, use these commands with Python 3.12 on your PATH.
+
+```powershell
 python -m venv .venv
-# Windows PowerShell
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python -m batchbook
-# macOS/Linux: use .venv/bin/python for both commands
+```
+
+On macOS or Linux, use these commands with Python 3.12 installed.
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m batchbook
 ```
 
 The launcher loads the benchmark opening balances into a fresh database. To replay the whole benchmark, point `BATCHBOOK_DB` at a different SQLite file before starting the Python launcher. Alternatively, start Compose with a new project name, such as `docker compose -p batchbook-replay up --build`, after stopping the first instance. Both approaches preserve the original data. `flask --app batchbook seed-demo` loads the same seed explicitly.
